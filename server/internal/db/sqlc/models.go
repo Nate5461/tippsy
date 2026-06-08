@@ -43,6 +43,7 @@ type User struct {
 	ProfilePicture *string            `json:"profile_picture"`
 	Location       *string            `json:"location"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	VerifiedAt     *pgtype.Timestamptz `json:"verified_at"`
 }
 
 type UserDrinkPreference struct {

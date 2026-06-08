@@ -1,16 +1,48 @@
 package httpapi
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Nate5461/tippsy/server/internal/auth"
 	"github.com/Nate5461/tippsy/server/internal/db/sqlc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
+
+const (
+	otpLength      = 6
+	otpTTL         = 15 * time.Minute
+	maxOTPAttempts = 5
+)
+
+// generateOTP returns a zero-padded 6-digit numeric code and its SHA-256 hex hash.
+func generateOTP() (code string, hash string, err error) {
+	b := make([]byte, 4)
+	if _, err = rand.Read(b); err != nil {
+		return "", "", fmt.Errorf("generate otp: %w", err)
+	}
+	// Fold into 0–999999 and zero-pad to 6 digits.
+	n := (uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])) % 1_000_000
+	code = fmt.Sprintf("%06d", n)
+	sum := sha256.Sum256([]byte(code))
+	hash = fmt.Sprintf("%x", sum)
+	return code, hash, nil
+}
+
+// hashOTP returns the SHA-256 hex hash of a code — used when verifying.
+func hashOTP(code string) string {
+	sum := sha256.Sum256([]byte(code))
+	return fmt.Sprintf("%x", sum)
+}
+
+// --- Register ---
 
 type registerRequest struct {
 	Username string `json:"username"`
@@ -61,11 +93,162 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := s.issueAndSendOTP(r, user.ID, user.Email, user.Username); err != nil {
+		writeError(w, http.StatusInternalServerError, "could not send verification email")
+		return
+	}
+
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"message": "User registered successfully!",
-		"user":    authUser{ID: user.ID.String(), Username: user.Username},
+		"message":              "Registration successful! Please check your email for a verification code.",
+		"pending_verification": true,
+		"user_id":              user.ID.String(),
 	})
 }
+
+// issueAndSendOTP generates an OTP, stores its hash, and emails it.
+func (s *Server) issueAndSendOTP(r *http.Request, userID uuid.UUID, email, username string) error {
+	code, codeHash, err := generateOTP()
+	if err != nil {
+		return err
+	}
+
+	if err := s.q.CreateEmailVerification(r.Context(), sqlc.CreateEmailVerificationParams{
+		UserID:    userID,
+		CodeHash:  codeHash,
+		ExpiresAt: time.Now().Add(otpTTL),
+	}); err != nil {
+		return fmt.Errorf("store verification: %w", err)
+	}
+
+	if err := s.mailer.SendOTP(email, username, code); err != nil {
+		return fmt.Errorf("send otp email: %w", err)
+	}
+	return nil
+}
+
+// --- Verify email ---
+
+type verifyEmailRequest struct {
+	UserID string `json:"user_id"`
+	Code   string `json:"code"`
+}
+
+func (s *Server) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req verifyEmailRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user_id")
+		return
+	}
+	req.Code = strings.TrimSpace(req.Code)
+	if req.Code == "" {
+		writeError(w, http.StatusBadRequest, "code is required")
+		return
+	}
+
+	verification, err := s.q.GetEmailVerification(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeError(w, http.StatusBadRequest, "no pending verification for this user")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "could not load verification")
+		return
+	}
+
+	if verification.Attempts >= maxOTPAttempts {
+		_ = s.q.DeleteEmailVerification(r.Context(), userID)
+		writeError(w, http.StatusBadRequest, "too many incorrect attempts; please request a new code")
+		return
+	}
+
+	if time.Now().After(verification.ExpiresAt.Time) {
+		_ = s.q.DeleteEmailVerification(r.Context(), userID)
+		writeError(w, http.StatusBadRequest, "verification code has expired; please request a new one")
+		return
+	}
+
+	if hashOTP(req.Code) != verification.CodeHash {
+		_ = s.q.IncrementVerificationAttempts(r.Context(), userID)
+		remaining := maxOTPAttempts - int(verification.Attempts) - 1
+		writeError(w, http.StatusUnauthorized, fmt.Sprintf("incorrect code; %d attempt(s) remaining", remaining))
+		return
+	}
+
+	// Code is correct — mark verified and clean up.
+	if err := s.q.MarkUserVerified(r.Context(), userID); err != nil {
+		writeError(w, http.StatusInternalServerError, "could not mark user as verified")
+		return
+	}
+	_ = s.q.DeleteEmailVerification(r.Context(), userID)
+
+	user, err := s.q.GetUserByID(r.Context(), userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not load user")
+		return
+	}
+
+	token, err := auth.IssueToken(s.cfg.JWTSecret, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not issue token")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, authResponse{
+		Token: token,
+		User:  authUser{ID: userID.String(), Username: user.Username},
+	})
+}
+
+// --- Resend verification ---
+
+type resendVerificationRequest struct {
+	UserID string `json:"user_id"`
+}
+
+func (s *Server) handleResendVerification(w http.ResponseWriter, r *http.Request) {
+	var req resendVerificationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	userID, err := uuid.Parse(req.UserID)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid user_id")
+		return
+	}
+
+	user, err := s.q.GetUserByID(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Don't leak whether the user exists.
+			writeJSON(w, http.StatusOK, map[string]string{"message": "If that account exists, a new code has been sent."})
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "could not load user")
+		return
+	}
+
+	if user.VerifiedAt != nil {
+		writeError(w, http.StatusBadRequest, "this account is already verified")
+		return
+	}
+
+	if err := s.issueAndSendOTP(r, user.ID, user.Email, user.Username); err != nil {
+		writeError(w, http.StatusInternalServerError, "could not send verification email")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "A new verification code has been sent to your email."})
+}
+
+// --- Login ---
 
 type loginRequest struct {
 	Email    string `json:"email"`
@@ -82,7 +265,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	user, err := s.q.GetUserByEmail(r.Context(), strings.TrimSpace(req.Email))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// Same response as a bad password to avoid leaking which emails exist.
 			writeError(w, http.StatusUnauthorized, "invalid credentials")
 			return
 		}
@@ -92,6 +274,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	if !auth.CheckPassword(user.PasswordHash, req.Password) {
 		writeError(w, http.StatusUnauthorized, "invalid credentials")
+		return
+	}
+
+	if user.VerifiedAt == nil {
+		writeError(w, http.StatusForbidden, "email address not verified; please check your inbox for a verification code")
 		return
 	}
 

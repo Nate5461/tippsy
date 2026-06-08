@@ -9,6 +9,7 @@ import (
 
 	"github.com/Nate5461/tippsy/server/internal/config"
 	"github.com/Nate5461/tippsy/server/internal/db/sqlc"
+	"github.com/Nate5461/tippsy/server/internal/email"
 	"github.com/Nate5461/tippsy/server/internal/httpapi"
 	"github.com/Nate5461/tippsy/server/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -39,8 +40,24 @@ func main() {
 		log.Fatalf("storage: %v", err)
 	}
 
+	// Wire up the mailer. If SMTP credentials are absent (local dev), fall back
+	// to the log sender which just prints codes to stdout.
+	var mailer email.Sender
+	if cfg.SMTPUsername == "" || cfg.SMTPPassword == "" {
+		log.Println("SMTP credentials not set — using log sender (OTPs printed to stdout)")
+		mailer = email.LogSender{}
+	} else {
+		mailer = email.NewSMTPSender(
+			cfg.SMTPHost,
+			cfg.SMTPPort,
+			cfg.SMTPUsername,
+			cfg.SMTPPassword,
+			cfg.SMTPFrom,
+		)
+	}
+
 	queries := sqlc.New(pool)
-	server := httpapi.NewServer(queries, cfg, files)
+	server := httpapi.NewServer(queries, cfg, files, mailer)
 
 	addr := ":" + cfg.Port
 	log.Printf("Tippsy API listening on %s", addr)
