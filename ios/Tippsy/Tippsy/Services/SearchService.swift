@@ -10,7 +10,7 @@ import Foundation
 struct SearchService {
     static let shared = SearchService()
     
-    static let baseURL = "http://localhost:3000"
+    static let baseURL = APIConfig.baseURL
     
     
     static func fetchTopUsers(query: String, completion: @escaping ([User]) -> Void) {

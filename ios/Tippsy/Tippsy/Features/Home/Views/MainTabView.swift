@@ -20,9 +20,14 @@ struct MainTabView: View {
             
             DiscoverView()
                 .tabItem {
-                    Label("Discover", systemImage: "magnifyingglass")
+                    Label("Search", systemImage: "magnifyingglass")
                 }
-            
+
+            MyBarView()
+                .tabItem {
+                    Label("My Bar", systemImage: "wineglass")
+                }
+
             ProfileView(viewModel: viewModel, isLoggedIn: $isLoggedIn) // Pass viewModel here
                 .tabItem {
                     Label("Profile", systemImage: "person")

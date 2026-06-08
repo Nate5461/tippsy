@@ -8,7 +8,7 @@
 import Foundation
 
 struct AuthService {
-    static let baseURL = "http://localhost:3000" // User authentication backend URL
+    static let baseURL = APIConfig.baseURL
     static var loggedInUserId: String? // Global variable to store user ID
     static var username: String?     // Global variable to store username
     static var regUsername: String?

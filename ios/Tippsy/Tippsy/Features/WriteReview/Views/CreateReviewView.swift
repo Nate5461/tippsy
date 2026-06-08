@@ -304,7 +304,7 @@ struct CreateReviewView: View {
     }
     
     private func fetchRestaurants() {
-        guard let url = URL(string: "http://localhost:3000/search/allRestaurants") else { return }
+        guard let url = URL(string: "\(APIConfig.baseURL)/search/allRestaurants") else { return }
         
         URLSession.shared.dataTask(with: url) { data, response, error in
             if let error = error {
@@ -329,7 +329,7 @@ struct CreateReviewView: View {
     }
     
     private func fetchDrinks() {
-        guard let url = URL(string: "http://localhost:3000/search/allDrinks") else { return }
+        guard let url = URL(string: "\(APIConfig.baseURL)/search/allDrinks") else { return }
         
         URLSession.shared.dataTask(with: url) { data, response, error in
             if let error = error {
@@ -362,7 +362,7 @@ struct CreateReviewView: View {
             showAlert = true
             return
         }
-        guard let url = URL(string: "http://localhost:3000/reviews") else { return }
+        guard let url = URL(string: "\(APIConfig.baseURL)/reviews") else { return }
         
         let boundary = UUID().uuidString
         var request = URLRequest(url: url)
