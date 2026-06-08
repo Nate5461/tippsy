@@ -6,17 +6,30 @@
 - Rate and review drinks and restaurants
 - Geolocation-based restaurant drink and search
 
-## Installation 
-- Install Node.js and run the following command:
+## Project layout
 ```
-npm install dotenv mongoose express body-parser cors
+backend/   Node.js + Express API (MongoDB via Mongoose)
+ios/       SwiftUI app (Xcode project)
 ```
-- Ensure xcode is available
 
-## Testing
-- Set directory to backend and run the following command in a valid IDE:
+## Installation
+- Install Node.js, then install backend dependencies:
 ```
+cd backend
+npm install
+```
+- Create a `backend/.env` file with at least:
+```
+MONGO_URI=<your MongoDB connection string>
+PORT=3000
+JWT_SECRET=<a long random string>
+```
+- Ensure Xcode is available for the iOS app.
+
+## Running
+- Start the API:
+```
+cd backend
 node server.js
 ```
-Run Tippsy.app in xcode in another window
-- Interact with test simulation in xcode
+- Open `ios/Tippsy/Tippsy.xcodeproj` in Xcode and run the app in the simulator.
