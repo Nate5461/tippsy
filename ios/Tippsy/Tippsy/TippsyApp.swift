@@ -14,17 +14,19 @@ struct TippsyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if isLoggedIn {
-                MainTabView(isLoggedIn: $isLoggedIn, viewModel: userViewModel)
-            } else {
-                LoginOrRegisterView(isLoggedIn: $isLoggedIn)
+            Group {
+                if isLoggedIn {
+                    MainTabView(isLoggedIn: $isLoggedIn, viewModel: userViewModel)
+                } else {
+                    LoginOrRegisterView(isLoggedIn: $isLoggedIn)
+                }
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .didReceiveUnauthorized)) { _ in
-            TokenStore.delete()
-            AuthService.loggedInUserId = nil
-            AuthService.username = nil
-            isLoggedIn = false
+            .onReceive(NotificationCenter.default.publisher(for: .didReceiveUnauthorized)) { _ in
+                TokenStore.delete()
+                AuthService.loggedInUserId = nil
+                AuthService.username = nil
+                isLoggedIn = false
+            }
         }
     }
 }
