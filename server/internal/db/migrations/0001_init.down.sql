@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS user_drink_preferences;
+DROP TABLE IF EXISTS reviews;
+DROP TABLE IF EXISTS follows;
+DROP TABLE IF EXISTS drinks;
+DROP TABLE IF EXISTS users;

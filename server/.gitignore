@@ -1,0 +1,9 @@
+# Local env / secrets
+.env
+
+# Build output
+/bin/
+
+# Uploaded files (runtime data, not source)
+/uploads/*
+!/uploads/.gitkeep
