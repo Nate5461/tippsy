@@ -13,7 +13,7 @@ class RestaurantViewModel: ObservableObject {
                 return
             }
 
-            let urlString = "http://localhost:3000/restaurants/name/\(encodedName)"
+            let urlString = "\(APIConfig.baseURL)/restaurants/name/\(encodedName)"
             print("Fetching URL: \(urlString)") // Add this line
 
             guard let url = URL(string: urlString) else {
@@ -55,7 +55,7 @@ class RestaurantViewModel: ObservableObject {
     }
 
     func fetchUserProfile(userId: String) {
-        let urlString = "http://localhost:3000/user/\(userId)"
+        let urlString = "\(APIConfig.baseURL)/user/\(userId)"
         guard let url = URL(string: urlString) else {
             self.errorMessage = "Invalid URL"
             return
