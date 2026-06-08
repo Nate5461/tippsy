@@ -74,8 +74,6 @@ struct OtherUserProfileView: View {
                                     Text("Drink: \(review.drinkName ?? "N/A")")
                                         .font(.subheadline)
                                         .fontWeight(.bold)
-                                    Text("Restaurant: \(review.restaurantName ?? "N/A")")
-                                        .font(.subheadline)
                                     Text("Rating: \(review.rating)/5")
                                         .font(.subheadline)
                                     Text(review.comment)
@@ -104,21 +102,6 @@ struct OtherUserProfileView: View {
                                 .fontWeight(.bold)
                             ForEach(user.preferences.drink, id: \.self) { drink in
                                 Text(drink)
-                                    .font(.body)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(10)
-                        .shadow(radius: 2)
-
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Restaurant Preferences")
-                                .font(.subheadline)
-                                .fontWeight(.bold)
-                            ForEach(user.preferences.restaurant, id: \.self) { restaurant in
-                                Text(restaurant)
                                     .font(.body)
                                     .foregroundColor(.secondary)
                             }

@@ -68,7 +68,7 @@ class UserViewModel: ObservableObject {
                                 username: follower.username,
                                 email: "", // Email is not provided in the response
                                 profilePicture: follower.profilePicture,
-                                preferences: Preferences(drink: [], restaurant: []),
+                                preferences: Preferences(drink: []),
                                 followers: [],
                                 following: []
                             )

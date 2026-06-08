@@ -10,24 +10,20 @@ import SwiftUI
 import PhotosUI
 
 struct CreateReviewView: View {
-    @State private var selectedRestaurant: String = ""
     @State private var selectedDrink: String = ""
     @State private var rating: Int = 1
     @State private var impairmentLevel: Int = 1
     @State private var comment: String = ""
-    @State private var restaurantOptions: [(id: String, name: String)] = []
     @State private var drinkOptions: [(id: String, name: String)] = []
     @State private var selectedPhoto: UIImage? = nil
     @State private var showPhotoPicker = false
     @State private var showAlert = false
     @State private var alertMessage = ""
-    
+
     // New state properties for drink search bar functionality
     @State private var drinkSearchText: String = ""
     @State private var showDrinkSuggestions: Bool = false
-    @State private var restaurantSearchText: String = ""
-    @State private var showRestaurantSuggestions: Bool = false
-    
+
     // Computed property to filter drink suggestions based on the search text.
     private var drinkSearchSuggestions: [(id: String, name: String)] {
         if drinkSearchText.isEmpty { return [] }
@@ -35,12 +31,6 @@ struct CreateReviewView: View {
         return Array(filtered.prefix(3))
     }
 
-    private var restaurantSearchSuggestions: [(id: String, name: String)] {
-        if restaurantSearchText.isEmpty { return [] }
-        let filtered = restaurantOptions.filter { $0.name.lowercased().contains(restaurantSearchText.lowercased()) }
-        return Array(filtered.prefix(3))
-    }
-    
     var body: some View {
         ZStack {
             // Background gradient
@@ -61,13 +51,7 @@ struct CreateReviewView: View {
                     
                     // Photo Picker Section
                     photoPickerSection
-                    
-                    // Restaurant Picker Section (remains as a drop-down)
-                    restaurantSearchSection
-                        .onAppear {
-                            fetchRestaurants()
-                        }
-                    
+
                     // Drink Search Section (replaces drop-down with a search bar)
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Search for Drink")
@@ -183,28 +167,6 @@ struct CreateReviewView: View {
         }
     }
     
-    private func pickerSection(title: String, selection: Binding<String>, options: [(id: String, name: String)]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
-                .foregroundColor(.white)
-            
-            Picker(title, selection: selection) {
-                if title == "Select Restaurant" {
-                    Text("Home").tag("Home")
-                }
-                ForEach(options, id: \.id) { option in
-                    Text(option.name).tag(option.id)
-                }
-            }
-            .pickerStyle(MenuPickerStyle())
-            .padding()
-            .background(Color.white.opacity(0.2))
-            .cornerRadius(10)
-            .shadow(radius: 5)
-        }
-    }
-    
     private func stepperSection(title: String, value: Binding<Int>, range: ClosedRange<Int>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("\(title): \(value.wrappedValue)")
@@ -232,63 +194,6 @@ struct CreateReviewView: View {
         }
     }
 
-    private var restaurantSearchSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Select Restaurant")
-                .font(.headline)
-                .foregroundColor(.white)
-            
-            if selectedRestaurant.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Search field for restaurants
-                    TextField("Search for a restaurant...", text: $restaurantSearchText, onEditingChanged: { isEditing in
-                        showRestaurantSuggestions = isEditing
-                    })
-                    .onSubmit {
-                        if !restaurantSearchText.trimmingCharacters(in: .whitespaces).isEmpty {
-                            // If user hits return without selecting a suggestion, use the typed value.
-                            selectedRestaurant = restaurantSearchText
-                        }
-                    }
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .padding(.horizontal)
-                    
-                    // Display suggestions if available
-                    if showRestaurantSuggestions, !restaurantSearchSuggestions.isEmpty {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(restaurantSearchSuggestions, id: \.id) { restaurant in
-                                Text(restaurant.name)
-                                    .padding(8)
-                                    .onTapGesture {
-                                        // When a suggestion is tapped, set the selection.
-                                        selectedRestaurant = restaurant.id
-                                        restaurantSearchText = restaurant.name
-                                        showRestaurantSuggestions = false
-                                    }
-                            }
-                        }
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
-                        .padding(.horizontal)
-                    }
-                }
-            } else {
-                // Display the selected restaurant and a change button.
-                HStack {
-                    Text("Selected Restaurant: \(restaurantSearchText)")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                    Button("Change") {
-                        selectedRestaurant = ""
-                        restaurantSearchText = ""
-                    }
-                    .foregroundColor(.blue)
-                }
-                .padding(.horizontal)
-            }
-        }
-    }
-    
     private var submitButton: some View {
         Button(action: submitReview) {
             Text("Submit Review")
@@ -301,31 +206,6 @@ struct CreateReviewView: View {
                 .shadow(radius: 5)
         }
         .padding(.vertical)
-    }
-    
-    private func fetchRestaurants() {
-        guard let url = URL(string: "\(APIConfig.baseURL)/search/allRestaurants") else { return }
-        
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            if let error = error {
-                print("Error fetching restaurants: \(error.localizedDescription)")
-                return
-            }
-            if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-                let restaurants = json.compactMap { restaurant -> (id: String, name: String)? in
-                    guard let id = restaurant["_id"] as? String, let name = restaurant["name"] as? String else { return nil }
-                    return (id: id, name: name)
-                }
-                DispatchQueue.main.async {
-                    self.restaurantOptions = restaurants
-                    if self.selectedRestaurant.isEmpty, let firstRestaurant = restaurants.first {
-                        self.selectedRestaurant = firstRestaurant.id
-                    }
-                }
-            } else {
-                print("Failed to parse restaurants response.")
-            }
-        }.resume()
     }
     
     private func fetchDrinks() {
@@ -373,7 +253,6 @@ struct CreateReviewView: View {
         let parameters: [String: Any?] = [
             "user_id": userId,
             "drink_id": selectedDrink,
-            "restaurant_id": selectedRestaurant == "Home" ? nil : selectedRestaurant,
             "rating": rating,
             "comment": comment,
             "impairment_level": impairmentLevel
@@ -415,7 +294,6 @@ struct CreateReviewView: View {
     }
     
     private func resetForm() {
-        selectedRestaurant = ""
         selectedDrink = ""
         rating = 1
         impairmentLevel = 1

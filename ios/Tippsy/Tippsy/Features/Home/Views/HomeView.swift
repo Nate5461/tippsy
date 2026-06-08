@@ -80,7 +80,7 @@ struct HomeView: View {
             // Display the first 3 followers
             HStack {
                 ForEach(user.followers.prefix(3), id: \.self) { follower in
-                    NavigationLink(destination: OtherUserProfileView(viewModel: UserViewModel(user: User(id: follower.id, username: follower.username, email: "", profilePicture: follower.profilePicture, preferences: Preferences(drink: [], restaurant: []), followers: [], following: [])))) {
+                    NavigationLink(destination: OtherUserProfileView(viewModel: UserViewModel(user: User(id: follower.id, username: follower.username, email: "", profilePicture: follower.profilePicture, preferences: Preferences(drink: []), followers: [], following: [])))) {
                         AsyncImage(url: URL(string: follower.profilePicture ?? "")) { image in
                             image.resizable()
                         } placeholder: {
@@ -238,7 +238,7 @@ struct HomeView: View {
                                 username: follower.username,
                                 email: "", // Email is not provided in the response
                                 profilePicture: follower.profilePicture,
-                                preferences: Preferences(drink: [], restaurant: []),
+                                preferences: Preferences(drink: []),
                                 followers: [],
                                 following: []
                             )
