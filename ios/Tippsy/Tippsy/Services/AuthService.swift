@@ -50,7 +50,6 @@ struct AuthService {
             "profile_picture": user.profilePicture,
             "preferences": [
                 "drink": user.preferences.drink,
-                "restaurant": user.preferences.restaurant,
             ]
         ]
 

@@ -14,13 +14,12 @@ struct EditProfileView: View {
 
     @State private var username: String = ""
     @State private var profilePicture: UIImage?
-    @State private var preferences: Preferences = Preferences(drink: [], restaurant: [])
+    @State private var preferences: Preferences = Preferences(drink: [])
 
     @State private var showAlert = false
     @State private var alertMessage = ""
     @State private var showPhotoPicker = false // To trigger image picker
     @State private var showAddDrink = false // To add drink preference
-    @State private var showAddRestaurant = false // To add restaurant preference
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -76,29 +75,6 @@ struct EditProfileView: View {
                 .padding(.top)
             }.sheet(isPresented: $showAddDrink) {
                 AddPreferenceView(preferenceType: "Drink", preferences: $preferences.drink)
-            }
-
-            VStack(alignment: .leading) {
-                Text("Restaurant Preferences").font(.headline)
-                List {
-                    ForEach(preferences.restaurant, id: \.self) { restaurant in Text(restaurant)
-                        .swipeActions {
-                            Button(role: .destructive) {
-                                preferences.restaurant.removeAll { $0 == restaurant }
-                            } label: {
-                                Text("Delete")
-                            }
-                        }
-                    }
-                }
-                Button("Add Restaurant") {
-                    showAddRestaurant = true
-                }
-                .padding(.top)
-                .padding(.bottom)
-            }
-            .sheet(isPresented: $showAddRestaurant) {
-                AddPreferenceView(preferenceType: "Restaurant", preferences: $preferences.restaurant)
             }
 
             Button(action: saveChanges) {
