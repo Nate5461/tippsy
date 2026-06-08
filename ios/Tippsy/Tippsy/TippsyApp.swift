@@ -10,7 +10,7 @@ import SwiftUI
 @main
 struct TippsyApp: App {
     @StateObject var userViewModel = UserViewModel()
-    @State private var isLoggedIn = false
+    @State private var isLoggedIn = TokenStore.read() != nil
 
     var body: some Scene {
         WindowGroup {
@@ -19,6 +19,12 @@ struct TippsyApp: App {
             } else {
                 LoginOrRegisterView(isLoggedIn: $isLoggedIn)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .didReceiveUnauthorized)) { _ in
+            TokenStore.delete()
+            AuthService.loggedInUserId = nil
+            AuthService.username = nil
+            isLoggedIn = false
         }
     }
 }

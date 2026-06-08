@@ -133,7 +133,9 @@ struct ProfileView: View {
 
                     // Logout Button
                     Button(action: {
+                        TokenStore.delete()
                         AuthService.loggedInUserId = nil
+                        AuthService.username = nil
                         isLoggedIn = false
                         viewModel.user = nil
                         viewModel.reviews = []

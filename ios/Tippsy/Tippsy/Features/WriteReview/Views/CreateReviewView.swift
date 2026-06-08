@@ -248,6 +248,9 @@ struct CreateReviewView: View {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if let token = TokenStore.read() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         
         var body = Data()
         let parameters: [String: Any?] = [
