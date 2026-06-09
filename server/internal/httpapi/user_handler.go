@@ -44,6 +44,8 @@ func (s *Server) buildUserDTO(ctx context.Context, u sqlc.User) (userDTO, error)
 		ID:             u.ID.String(),
 		Username:       u.Username,
 		Email:          u.Email,
+		DisplayName:    u.DisplayName,
+		Bio:            u.Bio,
 		ProfilePicture: u.ProfilePicture,
 		Preferences:    preferencesDTO{Drink: prefs},
 		Followers:      followerDTOsFromFollowers(followers),
@@ -86,8 +88,11 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, profileResponse{User: dto, Reviews: reviews})
 }
 
+// updateUserRequest holds the mutable profile fields. username and email are
+// permanent after signup and are intentionally not accepted here.
 type updateUserRequest struct {
-	Username       *string `json:"username"`
+	DisplayName    *string `json:"display_name"`
+	Bio            *string `json:"bio"`
 	ProfilePicture *string `json:"profile_picture"`
 }
 
@@ -109,7 +114,8 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := s.q.UpdateUser(r.Context(), sqlc.UpdateUserParams{
-		Username:       req.Username,
+		DisplayName:    req.DisplayName,
+		Bio:            req.Bio,
 		ProfilePicture: req.ProfilePicture,
 		ID:             id,
 	})

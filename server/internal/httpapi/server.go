@@ -49,6 +49,8 @@ type userDTO struct {
 	ID             string         `json:"id"`
 	Username       string         `json:"username"`
 	Email          string         `json:"email"`
+	DisplayName    *string        `json:"displayName"`
+	Bio            *string        `json:"bio"`
 	ProfilePicture *string        `json:"profilePicture"`
 	Preferences    preferencesDTO `json:"preferences"`
 	Followers      []followerDTO  `json:"followers"`
