@@ -9,10 +9,23 @@ SELECT * FROM users WHERE id = $1;
 -- name: GetUserByEmail :one
 SELECT * FROM users WHERE lower(email) = lower(@email);
 
--- name: ExistsUserByUsernameOrEmail :one
-SELECT EXISTS (
-    SELECT 1 FROM users WHERE lower(username) = lower(@username) OR lower(email) = lower(@email)
-);
+-- name: GetUserByUsername :one
+SELECT * FROM users WHERE lower(username) = lower(@username);
+
+-- Re-registration: overwrite an as-yet-unverified account's credentials so the
+-- email's rightful owner can claim it. The verified_at guard makes this affect
+-- zero rows for already-verified accounts.
+-- name: UpdateUnverifiedUserCredentials :one
+UPDATE users
+SET username = @username, password_hash = @password_hash
+WHERE id = @id AND verified_at IS NULL
+RETURNING *;
+
+-- Cleanup: drop unverified accounts whose verification window has long passed,
+-- freeing their username/email. Cascades remove any dependent rows.
+-- name: DeleteStaleUnverifiedUsers :execrows
+DELETE FROM users
+WHERE verified_at IS NULL AND created_at < @cutoff;
 
 -- name: UpdateUser :one
 UPDATE users

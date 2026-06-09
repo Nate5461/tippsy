@@ -6,6 +6,7 @@ import (
 
 	"github.com/Nate5461/tippsy/server/internal/config"
 	"github.com/Nate5461/tippsy/server/internal/db/sqlc"
+	"github.com/Nate5461/tippsy/server/internal/email"
 	"github.com/Nate5461/tippsy/server/internal/storage"
 )
 
@@ -14,11 +15,12 @@ type Server struct {
 	q     *sqlc.Queries
 	cfg   config.Config
 	files *storage.Storage
+	mailer email.Sender
 }
 
 // NewServer constructs a Server.
-func NewServer(q *sqlc.Queries, cfg config.Config, files *storage.Storage) *Server {
-	return &Server{q: q, cfg: cfg, files: files}
+func NewServer(q *sqlc.Queries, cfg config.Config, files *storage.Storage, mailer email.Sender) *Server {
+	return &Server{q: q, cfg: cfg, files: files, mailer: mailer}
 }
 
 // absoluteURL turns a stored relative path ("/uploads/x.jpg") into a full URL

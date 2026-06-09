@@ -15,6 +15,13 @@ type Config struct {
 	Port          string
 	UploadDir     string
 	PublicBaseURL string
+
+	// SMTP / email
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUsername string
+	SMTPPassword string
+	SMTPFrom     string
 }
 
 // Load reads configuration from the environment. A local .env file is loaded if
@@ -30,6 +37,12 @@ func Load() (Config, error) {
 		Port:          getenvDefault("PORT", "8080"),
 		UploadDir:     getenvDefault("UPLOAD_DIR", "./uploads"),
 		PublicBaseURL: getenvDefault("PUBLIC_BASE_URL", "http://localhost:8080"),
+
+		SMTPHost:     getenvDefault("SMTP_HOST", "smtp-relay.brevo.com"),
+		SMTPPort:     getenvDefault("SMTP_PORT", "587"),
+		SMTPUsername: os.Getenv("SMTP_USERNAME"),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:     getenvDefault("SMTP_FROM", "Tippsy <charliebissett906@gmail.com>"),
 	}
 
 	if cfg.DatabaseURL == "" {

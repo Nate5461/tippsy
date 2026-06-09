@@ -37,6 +37,8 @@ func (s *Server) Router() http.Handler {
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/register", s.handleRegister)
 		r.Post("/login", s.handleLogin)
+		r.Post("/verify-email", s.handleVerifyEmail)
+		r.Post("/resend-verification", s.handleResendVerification)
 	})
 
 	r.Route("/search", func(r chi.Router) {

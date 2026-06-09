@@ -18,6 +18,13 @@ type Drink struct {
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 }
 
+type EmailVerification struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	CodeHash  string             `json:"code_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	Attempts  int16              `json:"attempts"`
+}
+
 type Follow struct {
 	FollowerID uuid.UUID          `json:"follower_id"`
 	FolloweeID uuid.UUID          `json:"followee_id"`
@@ -43,6 +50,7 @@ type User struct {
 	ProfilePicture *string            `json:"profile_picture"`
 	Location       *string            `json:"location"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	VerifiedAt     pgtype.Timestamptz `json:"verified_at"`
 }
 
 type UserDrinkPreference struct {
