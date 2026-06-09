@@ -15,7 +15,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (id, username, email, password_hash)
 VALUES ($1, $2, $3, $4)
-RETURNING id, username, email, password_hash, profile_picture, location, created_at, verified_at
+RETURNING id, username, email, password_hash, profile_picture, location, created_at, verified_at, display_name, bio, updated_at
 `
 
 type CreateUserParams struct {
@@ -42,6 +42,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Location,
 		&i.CreatedAt,
 		&i.VerifiedAt,
+		&i.DisplayName,
+		&i.Bio,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -62,7 +65,7 @@ func (q *Queries) DeleteStaleUnverifiedUsers(ctx context.Context, cutoff pgtype.
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, username, email, password_hash, profile_picture, location, created_at, verified_at FROM users WHERE lower(email) = lower($1)
+SELECT id, username, email, password_hash, profile_picture, location, created_at, verified_at, display_name, bio, updated_at FROM users WHERE lower(email) = lower($1)
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -77,12 +80,15 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Location,
 		&i.CreatedAt,
 		&i.VerifiedAt,
+		&i.DisplayName,
+		&i.Bio,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, email, password_hash, profile_picture, location, created_at, verified_at FROM users WHERE id = $1
+SELECT id, username, email, password_hash, profile_picture, location, created_at, verified_at, display_name, bio, updated_at FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -97,12 +103,15 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Location,
 		&i.CreatedAt,
 		&i.VerifiedAt,
+		&i.DisplayName,
+		&i.Bio,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, password_hash, profile_picture, location, created_at, verified_at FROM users WHERE lower(username) = lower($1)
+SELECT id, username, email, password_hash, profile_picture, location, created_at, verified_at, display_name, bio, updated_at FROM users WHERE lower(username) = lower($1)
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -117,12 +126,15 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Location,
 		&i.CreatedAt,
 		&i.VerifiedAt,
+		&i.DisplayName,
+		&i.Bio,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const searchUsers = `-- name: SearchUsers :many
-SELECT id, username, email, password_hash, profile_picture, location, created_at, verified_at FROM users
+SELECT id, username, email, password_hash, profile_picture, location, created_at, verified_at, display_name, bio, updated_at FROM users
 WHERE username ILIKE $1
 ORDER BY username
 LIMIT 50
@@ -146,6 +158,9 @@ func (q *Queries) SearchUsers(ctx context.Context, pattern string) ([]User, erro
 			&i.Location,
 			&i.CreatedAt,
 			&i.VerifiedAt,
+			&i.DisplayName,
+			&i.Bio,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -158,7 +173,7 @@ func (q *Queries) SearchUsers(ctx context.Context, pattern string) ([]User, erro
 }
 
 const topUsers = `-- name: TopUsers :many
-SELECT u.id, u.username, u.email, u.password_hash, u.profile_picture, u.location, u.created_at, u.verified_at, COUNT(f.follower_id) AS follower_count
+SELECT u.id, u.username, u.email, u.password_hash, u.profile_picture, u.location, u.created_at, u.verified_at, u.display_name, u.bio, u.updated_at, COUNT(f.follower_id) AS follower_count
 FROM users u
 LEFT JOIN follows f ON f.followee_id = u.id
 GROUP BY u.id
@@ -175,6 +190,9 @@ type TopUsersRow struct {
 	Location       *string            `json:"location"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	VerifiedAt     pgtype.Timestamptz `json:"verified_at"`
+	DisplayName    *string            `json:"display_name"`
+	Bio            *string            `json:"bio"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	FollowerCount  int64              `json:"follower_count"`
 }
 
@@ -196,6 +214,9 @@ func (q *Queries) TopUsers(ctx context.Context) ([]TopUsersRow, error) {
 			&i.Location,
 			&i.CreatedAt,
 			&i.VerifiedAt,
+			&i.DisplayName,
+			&i.Bio,
+			&i.UpdatedAt,
 			&i.FollowerCount,
 		); err != nil {
 			return nil, err
@@ -212,7 +233,7 @@ const updateUnverifiedUserCredentials = `-- name: UpdateUnverifiedUserCredential
 UPDATE users
 SET username = $1, password_hash = $2
 WHERE id = $3 AND verified_at IS NULL
-RETURNING id, username, email, password_hash, profile_picture, location, created_at, verified_at
+RETURNING id, username, email, password_hash, profile_picture, location, created_at, verified_at, display_name, bio, updated_at
 `
 
 type UpdateUnverifiedUserCredentialsParams struct {
@@ -236,26 +257,39 @@ func (q *Queries) UpdateUnverifiedUserCredentials(ctx context.Context, arg Updat
 		&i.Location,
 		&i.CreatedAt,
 		&i.VerifiedAt,
+		&i.DisplayName,
+		&i.Bio,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET username        = COALESCE($1, username),
-    profile_picture = COALESCE($2, profile_picture)
-WHERE id = $3
-RETURNING id, username, email, password_hash, profile_picture, location, created_at, verified_at
+SET display_name    = COALESCE($1, display_name),
+    bio             = COALESCE($2, bio),
+    profile_picture = COALESCE($3, profile_picture)
+WHERE id = $4
+RETURNING id, username, email, password_hash, profile_picture, location, created_at, verified_at, display_name, bio, updated_at
 `
 
 type UpdateUserParams struct {
-	Username       *string   `json:"username"`
+	DisplayName    *string   `json:"display_name"`
+	Bio            *string   `json:"bio"`
 	ProfilePicture *string   `json:"profile_picture"`
 	ID             uuid.UUID `json:"id"`
 }
 
+// Updates only mutable profile fields. username and email are permanent after
+// signup, so they are deliberately not settable here. updated_at is maintained
+// by the users_set_updated_at trigger.
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUser, arg.Username, arg.ProfilePicture, arg.ID)
+	row := q.db.QueryRow(ctx, updateUser,
+		arg.DisplayName,
+		arg.Bio,
+		arg.ProfilePicture,
+		arg.ID,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -266,6 +300,9 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Location,
 		&i.CreatedAt,
 		&i.VerifiedAt,
+		&i.DisplayName,
+		&i.Bio,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

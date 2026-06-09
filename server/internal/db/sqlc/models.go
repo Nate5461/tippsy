@@ -51,6 +51,9 @@ type User struct {
 	Location       *string            `json:"location"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	VerifiedAt     pgtype.Timestamptz `json:"verified_at"`
+	DisplayName    *string            `json:"display_name"`
+	Bio            *string            `json:"bio"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
 type UserDrinkPreference struct {
