@@ -7,7 +7,6 @@ package sqlc
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -23,42 +22,13 @@ ON CONFLICT (user_id) DO UPDATE
 `
 
 type CreateEmailVerificationParams struct {
-	UserID    uuid.UUID `json:"user_id"`
-	CodeHash  string    `json:"code_hash"`
-	ExpiresAt time.Time `json:"expires_at"`
+	UserID    uuid.UUID          `json:"user_id"`
+	CodeHash  string             `json:"code_hash"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) CreateEmailVerification(ctx context.Context, arg CreateEmailVerificationParams) error {
 	_, err := q.db.Exec(ctx, createEmailVerification, arg.UserID, arg.CodeHash, arg.ExpiresAt)
-	return err
-}
-
-const getEmailVerification = `-- name: GetEmailVerification :one
-SELECT user_id, code_hash, expires_at, attempts
-FROM email_verifications
-WHERE user_id = $1
-`
-
-type EmailVerification struct {
-	UserID    uuid.UUID          `json:"user_id"`
-	CodeHash  string             `json:"code_hash"`
-	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
-	Attempts  int16              `json:"attempts"`
-}
-
-func (q *Queries) GetEmailVerification(ctx context.Context, userID uuid.UUID) (EmailVerification, error) {
-	row := q.db.QueryRow(ctx, getEmailVerification, userID)
-	var i EmailVerification
-	err := row.Scan(&i.UserID, &i.CodeHash, &i.ExpiresAt, &i.Attempts)
-	return i, err
-}
-
-const incrementVerificationAttempts = `-- name: IncrementVerificationAttempts :exec
-UPDATE email_verifications SET attempts = attempts + 1 WHERE user_id = $1
-`
-
-func (q *Queries) IncrementVerificationAttempts(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, incrementVerificationAttempts, userID)
 	return err
 }
 
@@ -71,11 +41,38 @@ func (q *Queries) DeleteEmailVerification(ctx context.Context, userID uuid.UUID)
 	return err
 }
 
+const getEmailVerification = `-- name: GetEmailVerification :one
+SELECT user_id, code_hash, expires_at, attempts
+FROM email_verifications
+WHERE user_id = $1
+`
+
+func (q *Queries) GetEmailVerification(ctx context.Context, userID uuid.UUID) (EmailVerification, error) {
+	row := q.db.QueryRow(ctx, getEmailVerification, userID)
+	var i EmailVerification
+	err := row.Scan(
+		&i.UserID,
+		&i.CodeHash,
+		&i.ExpiresAt,
+		&i.Attempts,
+	)
+	return i, err
+}
+
+const incrementVerificationAttempts = `-- name: IncrementVerificationAttempts :exec
+UPDATE email_verifications SET attempts = attempts + 1 WHERE user_id = $1
+`
+
+func (q *Queries) IncrementVerificationAttempts(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, incrementVerificationAttempts, userID)
+	return err
+}
+
 const markUserVerified = `-- name: MarkUserVerified :exec
 UPDATE users SET verified_at = now() WHERE id = $1
 `
 
-func (q *Queries) MarkUserVerified(ctx context.Context, userID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, markUserVerified, userID)
+func (q *Queries) MarkUserVerified(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markUserVerified, id)
 	return err
 }

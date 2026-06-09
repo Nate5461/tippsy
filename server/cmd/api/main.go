@@ -12,6 +12,7 @@ import (
 	"github.com/Nate5461/tippsy/server/internal/email"
 	"github.com/Nate5461/tippsy/server/internal/httpapi"
 	"github.com/Nate5461/tippsy/server/internal/storage"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -58,6 +59,26 @@ func main() {
 
 	queries := sqlc.New(pool)
 	server := httpapi.NewServer(queries, cfg, files, mailer)
+
+	// Background janitor: periodically purge unverified accounts whose verification
+	// window has long passed, freeing their reserved username/email.
+	go func() {
+		const (
+			sweepEvery = time.Hour
+			maxAge     = 24 * time.Hour
+		)
+		ticker := time.NewTicker(sweepEvery)
+		defer ticker.Stop()
+		for {
+			cutoff := pgtype.Timestamptz{Time: time.Now().Add(-maxAge), Valid: true}
+			if n, err := queries.DeleteStaleUnverifiedUsers(context.Background(), cutoff); err != nil {
+				log.Printf("janitor: delete stale unverified users: %v", err)
+			} else if n > 0 {
+				log.Printf("janitor: removed %d stale unverified account(s)", n)
+			}
+			<-ticker.C
+		}
+	}()
 
 	addr := ":" + cfg.Port
 	log.Printf("Tippsy API listening on %s", addr)
