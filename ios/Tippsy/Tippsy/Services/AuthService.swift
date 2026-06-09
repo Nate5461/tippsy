@@ -88,45 +88,106 @@ struct AuthService {
         }
     }
 
+    /// Registers a new account. The backend now requires email verification, so a
+    /// successful response carries a `user_id` and no token. The caller should route
+    /// the user to the email verification screen; a token is only issued once the
+    /// emailed code is confirmed via `verifyEmail`.
     static func register(username: String, email: String, password: String, completion: @escaping (Result<String, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/auth/register") else { return }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         let body = [
             "username": username,
             "email": email,
             "password": password
         ]
-        
+
         request.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [])
-        
+
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 completion(.failure(error))
                 return
             }
-            
-            if let data = data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let user = json["user"] as? [String: Any],
-               let userId = user["id"] as? String,
-               let uname = user["username"] as? String {
-                loggedInUserId = userId
-                AuthService.username = uname
-                if let token = json["token"] as? String {
-                    TokenStore.save(token)
-                }
-                completion(.success("Registration successful!"))
+
+            let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+            if let userId = json?["user_id"] as? String {
+                AuthService.regUsername = username
+                completion(.success(userId))
             } else {
-                completion(.failure(NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])))
-                    }
+                completion(.failure(serverError(from: json, response: response)))
+            }
         }.resume()
     }
-    
-    
+
+    /// Confirms the 6-digit code emailed during registration. On success the backend
+    /// returns a JWT and the account is fully logged in (token saved, ids populated).
+    static func verifyEmail(userId: String, code: String, completion: @escaping (Result<String, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/auth/verify-email") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["user_id": userId, "code": code])
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+
+            let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+            if let token = json?["token"] as? String,
+               let user = json?["user"] as? [String: Any],
+               let uid = user["id"] as? String,
+               let uname = user["username"] as? String {
+                loggedInUserId = uid
+                AuthService.username = uname
+                TokenStore.save(token)
+                completion(.success(token))
+            } else {
+                completion(.failure(serverError(from: json, response: response)))
+            }
+        }.resume()
+    }
+
+    /// Requests a fresh verification code for the given user.
+    static func resendVerification(userId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/auth/resend-verification") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["user_id": userId])
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                completion(.success(()))
+            } else {
+                let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+                completion(.failure(serverError(from: json, response: response)))
+            }
+        }.resume()
+    }
+
+    /// Builds a user-facing Error from a server `{ "error": "..." }` body, falling
+    /// back to a generic message that includes the HTTP status when present.
+    private static func serverError(from json: [String: Any]?, response: URLResponse?) -> Error {
+        if let message = json?["error"] as? String {
+            return NSError(domain: "AuthService", code: 400, userInfo: [NSLocalizedDescriptionKey: message])
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        return NSError(domain: "AuthService", code: status, userInfo: [NSLocalizedDescriptionKey: "Something went wrong. Please try again."])
+    }
+
+
     static func login(email: String, password: String, completion: @escaping (Result<String, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/auth/login") else { return }
         
@@ -147,10 +208,9 @@ struct AuthService {
                 return
             }
             
-            if let data = data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let token = json["token"] as? String,
-               let user = json["user"] as? [String: Any],
+            let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+            if let token = json?["token"] as? String,
+               let user = json?["user"] as? [String: Any],
                let userId = user["id"] as? String,
                let uname = user["username"] as? String {
                 loggedInUserId = userId
@@ -158,7 +218,7 @@ struct AuthService {
                 TokenStore.save(token)
                 completion(.success(token))
             } else {
-                completion(.failure(NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])))
+                completion(.failure(serverError(from: json, response: response)))
             }
         }.resume()
     }

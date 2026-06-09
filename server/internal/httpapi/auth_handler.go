@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -94,6 +95,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.issueAndSendOTP(r, user.ID, user.Email, user.Username); err != nil {
+		log.Printf("register: issueAndSendOTP for %s: %v", user.Email, err)
 		writeError(w, http.StatusInternalServerError, "could not send verification email")
 		return
 	}
@@ -241,6 +243,7 @@ func (s *Server) handleResendVerification(w http.ResponseWriter, r *http.Request
 	}
 
 	if err := s.issueAndSendOTP(r, user.ID, user.Email, user.Username); err != nil {
+		log.Printf("resend: issueAndSendOTP for %s: %v", user.Email, err)
 		writeError(w, http.StatusInternalServerError, "could not send verification email")
 		return
 	}
