@@ -29,11 +29,7 @@ func (s *Server) Router() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	// Serve uploaded photos statically.
-	fileServer := http.FileServer(http.Dir(s.cfg.UploadDir))
-	r.Handle("/uploads/*", http.StripPrefix("/uploads/", fileServer))
-
-	// --- Public routes ---
+	// --- Public routes: only auth and the health check ---
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/register", s.handleRegister)
 		r.Post("/login", s.handleLogin)
@@ -41,35 +37,58 @@ func (s *Server) Router() http.Handler {
 		r.Post("/resend-verification", s.handleResendVerification)
 	})
 
-	r.Route("/search", func(r chi.Router) {
-		r.Get("/users", s.handleSearchUsers)
-		r.Get("/drinks", s.handleSearchDrinks)
-		r.Get("/allDrinks", s.handleAllDrinks)
-	})
+	// --- Protected routes: everything else requires a valid token ---
+	r.Group(func(r chi.Router) {
+		r.Use(RequireAuth(s.cfg.JWTSecret))
 
-	r.Route("/users", func(r chi.Router) {
-		r.Get("/topUsers", s.handleTopUsers)
-		r.Get("/{id}", s.handleGetUser)
-		r.Get("/{id}/followers", s.handleFollowers)
-		r.Get("/{id}/following", s.handleFollowing)
-		r.Get("/{id}/following/reviews", s.handleFollowingReviews)
+		// Serve uploaded photos statically. The client must send its
+		// Authorization header on image requests too.
+		fileServer := http.FileServer(http.Dir(s.cfg.UploadDir))
+		r.Handle("/uploads/*", http.StripPrefix("/uploads/", fileServer))
 
-		// Protected sub-group.
-		r.Group(func(r chi.Router) {
-			r.Use(RequireAuth(s.cfg.JWTSecret))
+		r.Route("/search", func(r chi.Router) {
+			r.Get("/users", s.handleSearchUsers)
+		})
+
+		r.Get("/units", s.handleListUnits)
+
+		// Ingredient search results include the caller's custom ingredients.
+		r.Route("/ingredients", func(r chi.Router) {
+			r.Get("/", s.handleSearchIngredients)
+			r.Post("/", s.handleCreateIngredient)
+		})
+
+		r.Route("/recipes", func(r chi.Router) {
+			r.Get("/", s.handleSearchRecipes)
+			r.Post("/", s.handleCreateRecipe)
+			r.Get("/{id}", s.handleGetRecipe)
+			r.Put("/{id}", s.handleUpdateRecipe)
+			r.Delete("/{id}", s.handleDeleteRecipe)
+			r.Get("/{id}/reviews", s.handleRecipeReviews)
+			r.Post("/{id}/favourite", s.handleAddFavourite)
+			r.Delete("/{id}/favourite", s.handleRemoveFavourite)
+		})
+
+		r.Route("/users", func(r chi.Router) {
+			r.Get("/topUsers", s.handleTopUsers)
+			r.Get("/{id}", s.handleGetUser)
 			r.Put("/{id}", s.handleUpdateUser)
+			r.Get("/{id}/followers", s.handleFollowers)
+			r.Get("/{id}/following", s.handleFollowing)
+			r.Get("/{id}/following/reviews", s.handleFollowingReviews)
+			r.Get("/{id}/favourites", s.handleListFavourites)
 			r.Post("/{id}/follow", s.handleFollow)
 			r.Post("/{id}/unfollow", s.handleUnfollow)
+
+			// Personal: the bar and the menu it can make.
+			r.Get("/{id}/bar", s.handleListBar)
+			r.Post("/{id}/bar", s.handleAddBarItem)
+			r.Delete("/{id}/bar/{ingredientId}", s.handleRemoveBarItem)
+			r.Get("/{id}/menu", s.handleMyMenu)
 		})
-	})
 
-	r.Route("/reviews", func(r chi.Router) {
-		r.Get("/", s.handleListReviews)
-		r.Get("/drink", s.handleReviewsByDrink)
-		r.Get("/mostReviewedDrinks", s.handleMostReviewedDrinks)
-
-		r.Group(func(r chi.Router) {
-			r.Use(RequireAuth(s.cfg.JWTSecret))
+		r.Route("/reviews", func(r chi.Router) {
+			r.Get("/", s.handleListReviews)
 			r.Post("/", s.handleCreateReview)
 		})
 	})

@@ -26,10 +26,10 @@ WHERE f.follower_id = $1
 ORDER BY f.created_at DESC;
 
 -- name: FollowingReviews :many
-SELECT r.id, r.rating, r.comment, r.impairment_level, r.photo_url,
-       r.user_id, r.created_at, d.name AS drink_name, u.username
-FROM reviews r
-JOIN drinks d ON d.id = r.drink_id
-JOIN users u ON u.id = r.user_id
-WHERE r.user_id IN (SELECT followee_id FROM follows WHERE follower_id = $1)
-ORDER BY r.created_at DESC;
+SELECT rv.id, rv.rating, rv.comment, rv.impairment_level, rv.photo_url,
+       rv.user_id, rv.created_at, r.name AS recipe_name, u.username
+FROM reviews rv
+JOIN recipes r ON r.id = rv.recipe_id
+JOIN users u   ON u.id = rv.user_id
+WHERE rv.user_id IN (SELECT followee_id FROM follows WHERE follower_id = $1)
+ORDER BY rv.created_at DESC;

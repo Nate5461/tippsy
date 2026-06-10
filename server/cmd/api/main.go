@@ -58,7 +58,7 @@ func main() {
 	}
 
 	queries := sqlc.New(pool)
-	server := httpapi.NewServer(queries, cfg, files, mailer)
+	server := httpapi.NewServer(pool, queries, cfg, files, mailer)
 
 	// Background janitor: periodically purge unverified accounts whose verification
 	// window has long passed, freeing their reserved username/email.

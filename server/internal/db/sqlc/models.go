@@ -5,17 +5,242 @@
 package sqlc
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type Drink struct {
-	ID                 uuid.UUID          `json:"id"`
-	Name               string             `json:"name"`
-	Category           string             `json:"category"`
-	RecipeIngredients  []string           `json:"recipe_ingredients"`
-	RecipeInstructions *string            `json:"recipe_instructions"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+type IngredientKind string
+
+const (
+	IngredientKindSpirit        IngredientKind = "spirit"
+	IngredientKindLiqueur       IngredientKind = "liqueur"
+	IngredientKindFortifiedWine IngredientKind = "fortified_wine"
+	IngredientKindWine          IngredientKind = "wine"
+	IngredientKindBeerCider     IngredientKind = "beer_cider"
+	IngredientKindBitters       IngredientKind = "bitters"
+	IngredientKindJuice         IngredientKind = "juice"
+	IngredientKindSyrup         IngredientKind = "syrup"
+	IngredientKindSodaMixer     IngredientKind = "soda_mixer"
+	IngredientKindDairyEgg      IngredientKind = "dairy_egg"
+	IngredientKindFruit         IngredientKind = "fruit"
+	IngredientKindHerbSpice     IngredientKind = "herb_spice"
+	IngredientKindGarnish       IngredientKind = "garnish"
+	IngredientKindOther         IngredientKind = "other"
+)
+
+func (e *IngredientKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = IngredientKind(s)
+	case string:
+		*e = IngredientKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for IngredientKind: %T", src)
+	}
+	return nil
+}
+
+type NullIngredientKind struct {
+	IngredientKind IngredientKind `json:"ingredient_kind"`
+	Valid          bool           `json:"valid"` // Valid is true if IngredientKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullIngredientKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.IngredientKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.IngredientKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullIngredientKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.IngredientKind), nil
+}
+
+type MeasurePref string
+
+const (
+	MeasurePrefMetric   MeasurePref = "metric"
+	MeasurePrefImperial MeasurePref = "imperial"
+)
+
+func (e *MeasurePref) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MeasurePref(s)
+	case string:
+		*e = MeasurePref(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MeasurePref: %T", src)
+	}
+	return nil
+}
+
+type NullMeasurePref struct {
+	MeasurePref MeasurePref `json:"measure_pref"`
+	Valid       bool        `json:"valid"` // Valid is true if MeasurePref is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMeasurePref) Scan(value interface{}) error {
+	if value == nil {
+		ns.MeasurePref, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MeasurePref.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMeasurePref) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MeasurePref), nil
+}
+
+type RecipeMethod string
+
+const (
+	RecipeMethodShaken  RecipeMethod = "shaken"
+	RecipeMethodStirred RecipeMethod = "stirred"
+	RecipeMethodBuilt   RecipeMethod = "built"
+	RecipeMethodBlended RecipeMethod = "blended"
+	RecipeMethodOther   RecipeMethod = "other"
+)
+
+func (e *RecipeMethod) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RecipeMethod(s)
+	case string:
+		*e = RecipeMethod(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RecipeMethod: %T", src)
+	}
+	return nil
+}
+
+type NullRecipeMethod struct {
+	RecipeMethod RecipeMethod `json:"recipe_method"`
+	Valid        bool         `json:"valid"` // Valid is true if RecipeMethod is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRecipeMethod) Scan(value interface{}) error {
+	if value == nil {
+		ns.RecipeMethod, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RecipeMethod.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRecipeMethod) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RecipeMethod), nil
+}
+
+type RecipeSource string
+
+const (
+	RecipeSourceOfficial  RecipeSource = "official"
+	RecipeSourceCommunity RecipeSource = "community"
+)
+
+func (e *RecipeSource) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RecipeSource(s)
+	case string:
+		*e = RecipeSource(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RecipeSource: %T", src)
+	}
+	return nil
+}
+
+type NullRecipeSource struct {
+	RecipeSource RecipeSource `json:"recipe_source"`
+	Valid        bool         `json:"valid"` // Valid is true if RecipeSource is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRecipeSource) Scan(value interface{}) error {
+	if value == nil {
+		ns.RecipeSource, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RecipeSource.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRecipeSource) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RecipeSource), nil
+}
+
+type UnitKind string
+
+const (
+	UnitKindVolume UnitKind = "volume"
+	UnitKindCount  UnitKind = "count"
+)
+
+func (e *UnitKind) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UnitKind(s)
+	case string:
+		*e = UnitKind(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UnitKind: %T", src)
+	}
+	return nil
+}
+
+type NullUnitKind struct {
+	UnitKind UnitKind `json:"unit_kind"`
+	Valid    bool     `json:"valid"` // Valid is true if UnitKind is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUnitKind) Scan(value interface{}) error {
+	if value == nil {
+		ns.UnitKind, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UnitKind.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUnitKind) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UnitKind), nil
+}
+
+type BarItem struct {
+	UserID       uuid.UUID          `json:"user_id"`
+	IngredientID uuid.UUID          `json:"ingredient_id"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
 type EmailVerification struct {
@@ -25,21 +250,74 @@ type EmailVerification struct {
 	Attempts  int16              `json:"attempts"`
 }
 
+type Favourite struct {
+	UserID    uuid.UUID          `json:"user_id"`
+	RecipeID  uuid.UUID          `json:"recipe_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
 type Follow struct {
 	FollowerID uuid.UUID          `json:"follower_id"`
 	FolloweeID uuid.UUID          `json:"followee_id"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
+type Ingredient struct {
+	ID          uuid.UUID          `json:"id"`
+	Name        string             `json:"name"`
+	Kind        IngredientKind     `json:"kind"`
+	ParentID    pgtype.UUID        `json:"parent_id"`
+	Abv         float64            `json:"abv"`
+	Description *string            `json:"description"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+}
+
+type Recipe struct {
+	ID           uuid.UUID          `json:"id"`
+	Slug         string             `json:"slug"`
+	Name         string             `json:"name"`
+	Description  *string            `json:"description"`
+	Instructions *string            `json:"instructions"`
+	Method       RecipeMethod       `json:"method"`
+	Glass        *string            `json:"glass"`
+	Source       RecipeSource       `json:"source"`
+	AuthorID     pgtype.UUID        `json:"author_id"`
+	Attribution  *string            `json:"attribution"`
+	Sweetness    *int16             `json:"sweetness"`
+	EstAbv       *float64           `json:"est_abv"`
+	ImageUrl     *string            `json:"image_url"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type RecipeIngredient struct {
+	RecipeID     uuid.UUID `json:"recipe_id"`
+	Position     int16     `json:"position"`
+	IngredientID uuid.UUID `json:"ingredient_id"`
+	Amount       *float64  `json:"amount"`
+	UnitCode     *string   `json:"unit_code"`
+	Note         *string   `json:"note"`
+	IsOptional   bool      `json:"is_optional"`
+}
+
 type Review struct {
 	ID              uuid.UUID          `json:"id"`
 	UserID          uuid.UUID          `json:"user_id"`
-	DrinkID         uuid.UUID          `json:"drink_id"`
+	RecipeID        uuid.UUID          `json:"recipe_id"`
 	Rating          int16              `json:"rating"`
 	Comment         *string            `json:"comment"`
 	ImpairmentLevel *int16             `json:"impairment_level"`
 	PhotoUrl        *string            `json:"photo_url"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+type Unit struct {
+	Code    string   `json:"code"`
+	Name    string   `json:"name"`
+	Abbrev  string   `json:"abbrev"`
+	Kind    UnitKind `json:"kind"`
+	MlEquiv *float64 `json:"ml_equiv"`
 }
 
 type User struct {
@@ -54,10 +332,11 @@ type User struct {
 	DisplayName    *string            `json:"display_name"`
 	Bio            *string            `json:"bio"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	MeasurePref    MeasurePref        `json:"measure_pref"`
 }
 
 type UserDrinkPreference struct {
 	UserID    uuid.UUID          `json:"user_id"`
-	DrinkID   uuid.UUID          `json:"drink_id"`
+	RecipeID  uuid.UUID          `json:"recipe_id"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }

@@ -1,12 +1,12 @@
 -- name: ListUserDrinkPreferences :many
-SELECT d.name
+SELECT r.name
 FROM user_drink_preferences p
-JOIN drinks d ON d.id = p.drink_id
+JOIN recipes r ON r.id = p.recipe_id
 WHERE p.user_id = $1
-ORDER BY d.name;
+ORDER BY r.name;
 
 -- name: AddUserDrinkPreference :exec
-INSERT INTO user_drink_preferences (user_id, drink_id)
+INSERT INTO user_drink_preferences (user_id, recipe_id)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING;
 

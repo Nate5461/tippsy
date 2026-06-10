@@ -13,15 +13,15 @@ import (
 )
 
 const createReview = `-- name: CreateReview :one
-INSERT INTO reviews (id, user_id, drink_id, rating, comment, impairment_level, photo_url)
+INSERT INTO reviews (id, user_id, recipe_id, rating, comment, impairment_level, photo_url)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, drink_id, rating, comment, impairment_level, photo_url, created_at
+RETURNING id, user_id, recipe_id, rating, comment, impairment_level, photo_url, created_at
 `
 
 type CreateReviewParams struct {
 	ID              uuid.UUID `json:"id"`
 	UserID          uuid.UUID `json:"user_id"`
-	DrinkID         uuid.UUID `json:"drink_id"`
+	RecipeID        uuid.UUID `json:"recipe_id"`
 	Rating          int16     `json:"rating"`
 	Comment         *string   `json:"comment"`
 	ImpairmentLevel *int16    `json:"impairment_level"`
@@ -32,7 +32,7 @@ func (q *Queries) CreateReview(ctx context.Context, arg CreateReviewParams) (Rev
 	row := q.db.QueryRow(ctx, createReview,
 		arg.ID,
 		arg.UserID,
-		arg.DrinkID,
+		arg.RecipeID,
 		arg.Rating,
 		arg.Comment,
 		arg.ImpairmentLevel,
@@ -42,7 +42,7 @@ func (q *Queries) CreateReview(ctx context.Context, arg CreateReviewParams) (Rev
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.DrinkID,
+		&i.RecipeID,
 		&i.Rating,
 		&i.Comment,
 		&i.ImpairmentLevel,
@@ -53,12 +53,12 @@ func (q *Queries) CreateReview(ctx context.Context, arg CreateReviewParams) (Rev
 }
 
 const listReviews = `-- name: ListReviews :many
-SELECT r.id, r.rating, r.comment, r.impairment_level, r.photo_url,
-       r.user_id, r.created_at, d.name AS drink_name, u.username
-FROM reviews r
-JOIN drinks d ON d.id = r.drink_id
-JOIN users u ON u.id = r.user_id
-ORDER BY r.created_at DESC
+SELECT rv.id, rv.rating, rv.comment, rv.impairment_level, rv.photo_url,
+       rv.user_id, rv.created_at, r.name AS recipe_name, u.username
+FROM reviews rv
+JOIN recipes r ON r.id = rv.recipe_id
+JOIN users u   ON u.id = rv.user_id
+ORDER BY rv.created_at DESC
 `
 
 type ListReviewsRow struct {
@@ -69,7 +69,7 @@ type ListReviewsRow struct {
 	PhotoUrl        *string            `json:"photo_url"`
 	UserID          uuid.UUID          `json:"user_id"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	DrinkName       string             `json:"drink_name"`
+	RecipeName      string             `json:"recipe_name"`
 	Username        string             `json:"username"`
 }
 
@@ -90,7 +90,7 @@ func (q *Queries) ListReviews(ctx context.Context) ([]ListReviewsRow, error) {
 			&i.PhotoUrl,
 			&i.UserID,
 			&i.CreatedAt,
-			&i.DrinkName,
+			&i.RecipeName,
 			&i.Username,
 		); err != nil {
 			return nil, err
@@ -103,17 +103,17 @@ func (q *Queries) ListReviews(ctx context.Context) ([]ListReviewsRow, error) {
 	return items, nil
 }
 
-const listReviewsByDrink = `-- name: ListReviewsByDrink :many
-SELECT r.id, r.rating, r.comment, r.impairment_level, r.photo_url,
-       r.user_id, r.created_at, d.name AS drink_name, u.username
-FROM reviews r
-JOIN drinks d ON d.id = r.drink_id
-JOIN users u ON u.id = r.user_id
-WHERE r.drink_id = $1
-ORDER BY r.created_at DESC
+const listReviewsByRecipe = `-- name: ListReviewsByRecipe :many
+SELECT rv.id, rv.rating, rv.comment, rv.impairment_level, rv.photo_url,
+       rv.user_id, rv.created_at, r.name AS recipe_name, u.username
+FROM reviews rv
+JOIN recipes r ON r.id = rv.recipe_id
+JOIN users u   ON u.id = rv.user_id
+WHERE rv.recipe_id = $1
+ORDER BY rv.created_at DESC
 `
 
-type ListReviewsByDrinkRow struct {
+type ListReviewsByRecipeRow struct {
 	ID              uuid.UUID          `json:"id"`
 	Rating          int16              `json:"rating"`
 	Comment         *string            `json:"comment"`
@@ -121,19 +121,19 @@ type ListReviewsByDrinkRow struct {
 	PhotoUrl        *string            `json:"photo_url"`
 	UserID          uuid.UUID          `json:"user_id"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	DrinkName       string             `json:"drink_name"`
+	RecipeName      string             `json:"recipe_name"`
 	Username        string             `json:"username"`
 }
 
-func (q *Queries) ListReviewsByDrink(ctx context.Context, drinkID uuid.UUID) ([]ListReviewsByDrinkRow, error) {
-	rows, err := q.db.Query(ctx, listReviewsByDrink, drinkID)
+func (q *Queries) ListReviewsByRecipe(ctx context.Context, recipeID uuid.UUID) ([]ListReviewsByRecipeRow, error) {
+	rows, err := q.db.Query(ctx, listReviewsByRecipe, recipeID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListReviewsByDrinkRow
+	var items []ListReviewsByRecipeRow
 	for rows.Next() {
-		var i ListReviewsByDrinkRow
+		var i ListReviewsByRecipeRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Rating,
@@ -142,7 +142,7 @@ func (q *Queries) ListReviewsByDrink(ctx context.Context, drinkID uuid.UUID) ([]
 			&i.PhotoUrl,
 			&i.UserID,
 			&i.CreatedAt,
-			&i.DrinkName,
+			&i.RecipeName,
 			&i.Username,
 		); err != nil {
 			return nil, err
@@ -156,13 +156,13 @@ func (q *Queries) ListReviewsByDrink(ctx context.Context, drinkID uuid.UUID) ([]
 }
 
 const listReviewsByUser = `-- name: ListReviewsByUser :many
-SELECT r.id, r.rating, r.comment, r.impairment_level, r.photo_url,
-       r.user_id, r.created_at, d.name AS drink_name, u.username
-FROM reviews r
-JOIN drinks d ON d.id = r.drink_id
-JOIN users u ON u.id = r.user_id
-WHERE r.user_id = $1
-ORDER BY r.created_at DESC
+SELECT rv.id, rv.rating, rv.comment, rv.impairment_level, rv.photo_url,
+       rv.user_id, rv.created_at, r.name AS recipe_name, u.username
+FROM reviews rv
+JOIN recipes r ON r.id = rv.recipe_id
+JOIN users u   ON u.id = rv.user_id
+WHERE rv.user_id = $1
+ORDER BY rv.created_at DESC
 `
 
 type ListReviewsByUserRow struct {
@@ -173,7 +173,7 @@ type ListReviewsByUserRow struct {
 	PhotoUrl        *string            `json:"photo_url"`
 	UserID          uuid.UUID          `json:"user_id"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	DrinkName       string             `json:"drink_name"`
+	RecipeName      string             `json:"recipe_name"`
 	Username        string             `json:"username"`
 }
 
@@ -194,56 +194,8 @@ func (q *Queries) ListReviewsByUser(ctx context.Context, userID uuid.UUID) ([]Li
 			&i.PhotoUrl,
 			&i.UserID,
 			&i.CreatedAt,
-			&i.DrinkName,
+			&i.RecipeName,
 			&i.Username,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const mostReviewedDrinks = `-- name: MostReviewedDrinks :many
-SELECT d.id, d.name, d.category, d.recipe_ingredients, d.recipe_instructions,
-       d.created_at, COUNT(r.id) AS total_reviews
-FROM drinks d
-JOIN reviews r ON r.drink_id = d.id
-GROUP BY d.id
-ORDER BY total_reviews DESC
-LIMIT 5
-`
-
-type MostReviewedDrinksRow struct {
-	ID                 uuid.UUID          `json:"id"`
-	Name               string             `json:"name"`
-	Category           string             `json:"category"`
-	RecipeIngredients  []string           `json:"recipe_ingredients"`
-	RecipeInstructions *string            `json:"recipe_instructions"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
-	TotalReviews       int64              `json:"total_reviews"`
-}
-
-func (q *Queries) MostReviewedDrinks(ctx context.Context) ([]MostReviewedDrinksRow, error) {
-	rows, err := q.db.Query(ctx, mostReviewedDrinks)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []MostReviewedDrinksRow
-	for rows.Next() {
-		var i MostReviewedDrinksRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.Category,
-			&i.RecipeIngredients,
-			&i.RecipeInstructions,
-			&i.CreatedAt,
-			&i.TotalReviews,
 		); err != nil {
 			return nil, err
 		}

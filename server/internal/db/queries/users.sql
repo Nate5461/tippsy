@@ -34,7 +34,8 @@ WHERE verified_at IS NULL AND created_at < @cutoff;
 UPDATE users
 SET display_name    = COALESCE(sqlc.narg('display_name'), display_name),
     bio             = COALESCE(sqlc.narg('bio'), bio),
-    profile_picture = COALESCE(sqlc.narg('profile_picture'), profile_picture)
+    profile_picture = COALESCE(sqlc.narg('profile_picture'), profile_picture),
+    measure_pref    = COALESCE(sqlc.narg('measure_pref'), measure_pref)
 WHERE id = sqlc.arg('id')
 RETURNING *;
 

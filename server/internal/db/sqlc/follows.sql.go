@@ -29,13 +29,13 @@ func (q *Queries) FollowUser(ctx context.Context, arg FollowUserParams) error {
 }
 
 const followingReviews = `-- name: FollowingReviews :many
-SELECT r.id, r.rating, r.comment, r.impairment_level, r.photo_url,
-       r.user_id, r.created_at, d.name AS drink_name, u.username
-FROM reviews r
-JOIN drinks d ON d.id = r.drink_id
-JOIN users u ON u.id = r.user_id
-WHERE r.user_id IN (SELECT followee_id FROM follows WHERE follower_id = $1)
-ORDER BY r.created_at DESC
+SELECT rv.id, rv.rating, rv.comment, rv.impairment_level, rv.photo_url,
+       rv.user_id, rv.created_at, r.name AS recipe_name, u.username
+FROM reviews rv
+JOIN recipes r ON r.id = rv.recipe_id
+JOIN users u   ON u.id = rv.user_id
+WHERE rv.user_id IN (SELECT followee_id FROM follows WHERE follower_id = $1)
+ORDER BY rv.created_at DESC
 `
 
 type FollowingReviewsRow struct {
@@ -46,7 +46,7 @@ type FollowingReviewsRow struct {
 	PhotoUrl        *string            `json:"photo_url"`
 	UserID          uuid.UUID          `json:"user_id"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	DrinkName       string             `json:"drink_name"`
+	RecipeName      string             `json:"recipe_name"`
 	Username        string             `json:"username"`
 }
 
@@ -67,7 +67,7 @@ func (q *Queries) FollowingReviews(ctx context.Context, followerID uuid.UUID) ([
 			&i.PhotoUrl,
 			&i.UserID,
 			&i.CreatedAt,
-			&i.DrinkName,
+			&i.RecipeName,
 			&i.Username,
 		); err != nil {
 			return nil, err
