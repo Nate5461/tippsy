@@ -274,15 +274,17 @@ func (q *Queries) UpdateUnverifiedUserCredentials(ctx context.Context, arg Updat
 
 const updateUser = `-- name: UpdateUser :one
 UPDATE users
-SET display_name    = COALESCE($1, display_name),
-    bio             = COALESCE($2, bio),
-    profile_picture = COALESCE($3, profile_picture),
-    measure_pref    = COALESCE($4, measure_pref)
-WHERE id = $5
+SET username        = COALESCE($1, username),
+    display_name    = COALESCE($2, display_name),
+    bio             = COALESCE($3, bio),
+    profile_picture = COALESCE($4, profile_picture),
+    measure_pref    = COALESCE($5, measure_pref)
+WHERE id = $6
 RETURNING id, username, email, password_hash, profile_picture, location, created_at, verified_at, display_name, bio, updated_at, measure_pref
 `
 
 type UpdateUserParams struct {
+	Username       *string      `json:"username"`
 	DisplayName    *string      `json:"display_name"`
 	Bio            *string      `json:"bio"`
 	ProfilePicture *string      `json:"profile_picture"`
@@ -290,11 +292,13 @@ type UpdateUserParams struct {
 	ID             uuid.UUID    `json:"id"`
 }
 
-// Updates only mutable profile fields. username and email are permanent after
-// signup, so they are deliberately not settable here. updated_at is maintained
-// by the users_set_updated_at trigger.
+// Updates the mutable profile fields. email is permanent after signup, but
+// username may be changed (e.g. during account setup) subject to a
+// uniqueness check performed by the caller. updated_at is maintained by the
+// users_set_updated_at trigger.
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, updateUser,
+		arg.Username,
 		arg.DisplayName,
 		arg.Bio,
 		arg.ProfilePicture,

@@ -88,6 +88,38 @@ struct AuthService {
         }
     }
 
+    /// Saves the profile fields collected on the post-verification account setup
+    /// screen: the user's chosen username (mandatory), optional display name and
+    /// profile picture, and their preferred unit system.
+    static func completeAccountSetup(userId: String, username: String, displayName: String?, profilePicture: String?, measurePref: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/users/\(userId)") else { return }
+
+        var body: [String: Any] = [
+            "username": username,
+            "measurePref": measurePref
+        ]
+        if let displayName = displayName, !displayName.isEmpty {
+            body["display_name"] = displayName
+        }
+        if let profilePicture = profilePicture {
+            body["profile_picture"] = profilePicture
+        }
+
+        performAuthenticatedRequest(url: url, method: "PUT", body: body) { data, response, error in
+            if let error = error {
+                completion(.failure(error))
+                return
+            }
+            if let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
+                AuthService.username = username
+                completion(.success(()))
+            } else {
+                let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+                completion(.failure(serverError(from: json, response: response)))
+            }
+        }
+    }
+
     /// Registers a new account. The backend now requires email verification, so a
     /// successful response carries a `user_id` and no token. The caller should route
     /// the user to the email verification screen; a token is only issued once the

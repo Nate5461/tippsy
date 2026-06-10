@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/Nate5461/tippsy/server/internal/auth"
 	"github.com/Nate5461/tippsy/server/internal/db/sqlc"
@@ -93,9 +94,10 @@ func (s *Server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, profileResponse{User: dto, Reviews: reviews})
 }
 
-// updateUserRequest holds the mutable profile fields. username and email are
-// permanent after signup and are intentionally not accepted here.
+// updateUserRequest holds the mutable profile fields. email is permanent
+// after signup and is intentionally not accepted here.
 type updateUserRequest struct {
+	Username       *string `json:"username"`
 	DisplayName    *string `json:"display_name"`
 	Bio            *string `json:"bio"`
 	ProfilePicture *string `json:"profile_picture"`
@@ -130,7 +132,24 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if req.Username != nil {
+		username := strings.TrimSpace(*req.Username)
+		if username == "" {
+			writeError(w, http.StatusBadRequest, "username cannot be empty")
+			return
+		}
+		if taken, terr := s.usernameTakenByOther(r.Context(), username, &id); terr != nil {
+			writeError(w, http.StatusInternalServerError, "could not check username")
+			return
+		} else if taken {
+			writeError(w, http.StatusConflict, "that username is taken")
+			return
+		}
+		req.Username = &username
+	}
+
 	user, err := s.q.UpdateUser(r.Context(), sqlc.UpdateUserParams{
+		Username:       req.Username,
 		DisplayName:    req.DisplayName,
 		Bio:            req.Bio,
 		ProfilePicture: req.ProfilePicture,

@@ -27,12 +27,14 @@ RETURNING *;
 DELETE FROM users
 WHERE verified_at IS NULL AND created_at < @cutoff;
 
--- Updates only mutable profile fields. username and email are permanent after
--- signup, so they are deliberately not settable here. updated_at is maintained
--- by the users_set_updated_at trigger.
+-- Updates the mutable profile fields. email is permanent after signup, but
+-- username may be changed (e.g. during account setup) subject to a
+-- uniqueness check performed by the caller. updated_at is maintained by the
+-- users_set_updated_at trigger.
 -- name: UpdateUser :one
 UPDATE users
-SET display_name    = COALESCE(sqlc.narg('display_name'), display_name),
+SET username        = COALESCE(sqlc.narg('username'), username),
+    display_name    = COALESCE(sqlc.narg('display_name'), display_name),
     bio             = COALESCE(sqlc.narg('bio'), bio),
     profile_picture = COALESCE(sqlc.narg('profile_picture'), profile_picture),
     measure_pref    = COALESCE(sqlc.narg('measure_pref'), measure_pref)

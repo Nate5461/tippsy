@@ -18,6 +18,7 @@ struct EmailVerificationView: View {
     @State private var isResending = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+    @State private var verifiedUserId: String?
 
     var body: some View {
         VStack(spacing: 24) {
@@ -78,6 +79,9 @@ struct EmailVerificationView: View {
         }
         .padding()
         .navigationBarBackButtonHidden(isVerifying)
+        .navigationDestination(item: $verifiedUserId) { userId in
+            AccountSetupView(isLoggedIn: $isLoggedIn, userId: userId)
+        }
         .alert(isPresented: $showAlert) {
             Alert(title: Text("Verification"), message: Text(alertMessage), dismissButton: .default(Text("OK")))
         }
@@ -90,8 +94,9 @@ struct EmailVerificationView: View {
                 isVerifying = false
                 switch result {
                 case .success:
-                    // Token saved by AuthService; switch the app root to MainTabView.
-                    isLoggedIn = true
+                    // Token saved by AuthService; continue to account setup
+                    // before switching the app root to MainTabView.
+                    verifiedUserId = userId
                 case .failure(let error):
                     alertMessage = error.localizedDescription
                     showAlert = true
