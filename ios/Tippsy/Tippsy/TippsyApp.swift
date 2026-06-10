@@ -9,8 +9,8 @@ import SwiftUI
 
 @main
 struct TippsyApp: App {
+    @StateObject var userStore = UserStore()
     @StateObject var userViewModel = UserViewModel()
-    @State private var isLoggedIn = TokenStore.read() != nil
     @State private var isLoading = true
 
     var body: some Scene {
@@ -25,19 +25,19 @@ struct TippsyApp: App {
                                 isLoading = false
                             }
                         }
-                } else if isLoggedIn {
-                    MainTabView(isLoggedIn: $isLoggedIn, viewModel: userViewModel)
+                } else if userStore.isLoggedIn {
+                    MainTabView(isLoggedIn: $userStore.isLoggedIn, viewModel: userViewModel)
                         .transition(.opacity)
                 } else {
-                    LoginOrRegisterView(isLoggedIn: $isLoggedIn)
+                    LoginView(isLoggedIn: $userStore.isLoggedIn)
                         .transition(.opacity)
                 }
             }
+            .environmentObject(userStore)
             .onReceive(NotificationCenter.default.publisher(for: .didReceiveUnauthorized)) { _ in
-                TokenStore.delete()
                 AuthService.loggedInUserId = nil
                 AuthService.username = nil
-                isLoggedIn = false
+                userStore.logout()
             }
         }
     }
