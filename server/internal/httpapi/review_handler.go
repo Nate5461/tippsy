@@ -22,9 +22,9 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
 	}
 	userID, _ := auth.GetUserID(r.Context())
 
-	drinkID, err := uuid.Parse(r.FormValue("drink_id"))
+	recipeID, err := uuid.Parse(r.FormValue("recipe_id"))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "valid drink_id is required")
+		writeError(w, http.StatusBadRequest, "valid recipe_id is required")
 		return
 	}
 
@@ -34,20 +34,20 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Confirm the drink exists so we can return a clean 400 rather than a FK error.
-	if _, err := s.q.GetDrinkByID(r.Context(), drinkID); err != nil {
+	// Confirm the recipe exists so we can return a clean 400 rather than a FK error.
+	if _, err := s.q.GetRecipeByID(r.Context(), recipeID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			writeError(w, http.StatusBadRequest, "drink not found")
+			writeError(w, http.StatusBadRequest, "recipe not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "could not verify drink")
+		writeError(w, http.StatusInternalServerError, "could not verify recipe")
 		return
 	}
 
 	params := sqlc.CreateReviewParams{
 		ID:              uuid.New(),
 		UserID:          userID,
-		DrinkID:         drinkID,
+		RecipeID:        recipeID,
 		Rating:          int16(rating),
 		Comment:         optionalString(r.FormValue("comment")),
 		ImpairmentLevel: optionalInt16(r.FormValue("impairment_level")),
@@ -92,20 +92,20 @@ func (s *Server) handleListReviews(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-func (s *Server) handleReviewsByDrink(w http.ResponseWriter, r *http.Request) {
-	drinkID, err := uuid.Parse(r.URL.Query().Get("drinkId"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "valid drinkId query parameter is required")
+// handleRecipeReviews serves GET /recipes/{id}/reviews.
+func (s *Server) handleRecipeReviews(w http.ResponseWriter, r *http.Request) {
+	recipeID, ok := parseIDParam(w, r, "id")
+	if !ok {
 		return
 	}
-	rows, err := s.q.ListReviewsByDrink(r.Context(), drinkID)
+	rows, err := s.q.ListReviewsByRecipe(r.Context(), recipeID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not load reviews")
 		return
 	}
 	out := make([]reviewDTO, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, s.toReviewDTO(fieldsFromDrink(row)))
+		out = append(out, s.toReviewDTO(fieldsFromRecipe(row)))
 	}
 	writeJSON(w, http.StatusOK, out)
 }

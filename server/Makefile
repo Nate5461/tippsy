@@ -3,7 +3,7 @@
 DATABASE_URL ?= postgres://tippsy:tippsy@localhost:5432/tippsy?sslmode=disable
 MIGRATIONS   := internal/db/migrations
 
-.PHONY: db-up db-down migrate-up migrate-down sqlc run build test test-integration tidy
+.PHONY: db-up db-down migrate-up migrate-down sqlc seed run build test test-integration tidy
 
 ## Start/stop local Postgres
 db-up:
@@ -22,6 +22,10 @@ migrate-down:
 ## Regenerate type-safe query code from SQL
 sqlc:
 	sqlc generate
+
+## Import official ingredient/recipe content (idempotent; see internal/seed/README.md)
+seed:
+	DATABASE_URL="$(DATABASE_URL)" go run ./cmd/seed -dir internal/seed/data
 
 ## Run / build the server
 run:

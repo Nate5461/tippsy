@@ -40,6 +40,10 @@ func (s *Server) buildUserDTO(ctx context.Context, u sqlc.User) (userDTO, error)
 	if prefs == nil {
 		prefs = []string{}
 	}
+	measurePref := u.MeasurePref
+	if measurePref == "" {
+		measurePref = sqlc.MeasurePrefMetric
+	}
 	return userDTO{
 		ID:             u.ID.String(),
 		Username:       u.Username,
@@ -47,6 +51,7 @@ func (s *Server) buildUserDTO(ctx context.Context, u sqlc.User) (userDTO, error)
 		DisplayName:    u.DisplayName,
 		Bio:            u.Bio,
 		ProfilePicture: u.ProfilePicture,
+		MeasurePref:    string(measurePref),
 		Preferences:    preferencesDTO{Drink: prefs},
 		Followers:      followerDTOsFromFollowers(followers),
 		Following:      followerDTOsFromFollowing(following),
@@ -94,6 +99,7 @@ type updateUserRequest struct {
 	DisplayName    *string `json:"display_name"`
 	Bio            *string `json:"bio"`
 	ProfilePicture *string `json:"profile_picture"`
+	MeasurePref    *string `json:"measurePref"`
 }
 
 func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -112,11 +118,23 @@ func (s *Server) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
+	var measurePref *sqlc.MeasurePref
+	if req.MeasurePref != nil {
+		switch *req.MeasurePref {
+		case string(sqlc.MeasurePrefMetric), string(sqlc.MeasurePrefImperial):
+			mp := sqlc.MeasurePref(*req.MeasurePref)
+			measurePref = &mp
+		default:
+			writeError(w, http.StatusBadRequest, "measurePref must be metric or imperial")
+			return
+		}
+	}
 
 	user, err := s.q.UpdateUser(r.Context(), sqlc.UpdateUserParams{
 		DisplayName:    req.DisplayName,
 		Bio:            req.Bio,
 		ProfilePicture: req.ProfilePicture,
+		MeasurePref:    measurePref,
 		ID:             id,
 	})
 	if err != nil {

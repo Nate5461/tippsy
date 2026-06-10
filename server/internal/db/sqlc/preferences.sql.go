@@ -12,18 +12,18 @@ import (
 )
 
 const addUserDrinkPreference = `-- name: AddUserDrinkPreference :exec
-INSERT INTO user_drink_preferences (user_id, drink_id)
+INSERT INTO user_drink_preferences (user_id, recipe_id)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING
 `
 
 type AddUserDrinkPreferenceParams struct {
-	UserID  uuid.UUID `json:"user_id"`
-	DrinkID uuid.UUID `json:"drink_id"`
+	UserID   uuid.UUID `json:"user_id"`
+	RecipeID uuid.UUID `json:"recipe_id"`
 }
 
 func (q *Queries) AddUserDrinkPreference(ctx context.Context, arg AddUserDrinkPreferenceParams) error {
-	_, err := q.db.Exec(ctx, addUserDrinkPreference, arg.UserID, arg.DrinkID)
+	_, err := q.db.Exec(ctx, addUserDrinkPreference, arg.UserID, arg.RecipeID)
 	return err
 }
 
@@ -37,11 +37,11 @@ func (q *Queries) ClearUserDrinkPreferences(ctx context.Context, userID uuid.UUI
 }
 
 const listUserDrinkPreferences = `-- name: ListUserDrinkPreferences :many
-SELECT d.name
+SELECT r.name
 FROM user_drink_preferences p
-JOIN drinks d ON d.id = p.drink_id
+JOIN recipes r ON r.id = p.recipe_id
 WHERE p.user_id = $1
-ORDER BY d.name
+ORDER BY r.name
 `
 
 func (q *Queries) ListUserDrinkPreferences(ctx context.Context, userID uuid.UUID) ([]string, error) {

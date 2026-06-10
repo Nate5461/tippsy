@@ -1,0 +1,162 @@
+{
+  "ingredients": [
+    { "name": "Vodka", "kind": "spirit", "abv": 40 },
+    { "name": "Grey Goose", "kind": "spirit", "abv": 40, "parent": "Vodka", "description": "French wheat vodka" },
+    { "name": "Gin", "kind": "spirit", "abv": 42 },
+    { "name": "White Rum", "kind": "spirit", "abv": 40 },
+    { "name": "Dark Rum", "kind": "spirit", "abv": 40 },
+    { "name": "Tequila Blanco", "kind": "spirit", "abv": 40 },
+    { "name": "Bourbon", "kind": "spirit", "abv": 45 },
+    { "name": "Rye Whiskey", "kind": "spirit", "abv": 45 },
+    { "name": "Campari", "kind": "liqueur", "abv": 25 },
+    { "name": "Triple Sec", "kind": "liqueur", "abv": 30 },
+    { "name": "Coffee Liqueur", "kind": "liqueur", "abv": 20 },
+    { "name": "Sweet Vermouth", "kind": "fortified_wine", "abv": 16 },
+    { "name": "Dry Vermouth", "kind": "fortified_wine", "abv": 18 },
+    { "name": "Angostura Bitters", "kind": "bitters", "abv": 44.7 },
+    { "name": "Lime Juice", "kind": "juice", "abv": 0, "description": "Freshly squeezed" },
+    { "name": "Lemon Juice", "kind": "juice", "abv": 0, "description": "Freshly squeezed" },
+    { "name": "Simple Syrup", "kind": "syrup", "abv": 0, "description": "1:1 sugar and water" },
+    { "name": "Espresso", "kind": "other", "abv": 0, "description": "Freshly pulled shot" },
+    { "name": "Soda Water", "kind": "soda_mixer", "abv": 0 },
+    { "name": "Egg White", "kind": "dairy_egg", "abv": 0 },
+    { "name": "Mint", "kind": "herb_spice", "abv": 0 },
+    { "name": "Salt", "kind": "herb_spice", "abv": 0 },
+    { "name": "Sugar Cube", "kind": "other", "abv": 0 },
+    { "name": "Orange Peel", "kind": "garnish", "abv": 0 },
+    { "name": "Lime", "kind": "fruit", "abv": 0 },
+    { "name": "Cocktail Cherry", "kind": "garnish", "abv": 0 }
+  ],
+  "recipes": [
+    {
+      "slug": "old-fashioned",
+      "name": "Old Fashioned",
+      "method": "stirred",
+      "glass": "rocks",
+      "sweetness": 6,
+      "attribution": "Classic",
+      "description": "The original cocktail: spirit, sugar, bitters.",
+      "instructions": "Muddle the sugar cube with the bitters and a splash of water. Add bourbon and a large ice cube, stir until well chilled, and express the orange peel over the top.",
+      "ingredients": [
+        { "name": "Bourbon", "amount": 60, "unit": "ml" },
+        { "name": "Sugar Cube", "amount": 1, "unit": "cube" },
+        { "name": "Angostura Bitters", "amount": 2, "unit": "dash" },
+        { "name": "Orange Peel", "amount": 1, "unit": "twist", "optional": true, "note": "garnish" }
+      ]
+    },
+    {
+      "slug": "margarita",
+      "name": "Margarita",
+      "method": "shaken",
+      "glass": "coupe",
+      "sweetness": 5,
+      "attribution": "Classic",
+      "description": "Tequila, lime, and orange liqueur in perfect balance.",
+      "instructions": "Shake everything hard with ice and strain into a chilled, salt-rimmed glass.",
+      "ingredients": [
+        { "name": "Tequila Blanco", "amount": 50, "unit": "ml" },
+        { "name": "Lime Juice", "amount": 25, "unit": "ml" },
+        { "name": "Triple Sec", "amount": 20, "unit": "ml" },
+        { "name": "Salt", "amount": 1, "unit": "rim", "optional": true }
+      ]
+    },
+    {
+      "slug": "negroni",
+      "name": "Negroni",
+      "method": "stirred",
+      "glass": "rocks",
+      "sweetness": 6,
+      "attribution": "Classic",
+      "description": "Equal parts gin, Campari, and sweet vermouth — bittersweet and timeless.",
+      "instructions": "Stir all ingredients over ice until well chilled, strain over a large cube, and garnish with an orange peel.",
+      "ingredients": [
+        { "name": "Gin", "amount": 30, "unit": "ml" },
+        { "name": "Campari", "amount": 30, "unit": "ml" },
+        { "name": "Sweet Vermouth", "amount": 30, "unit": "ml" },
+        { "name": "Orange Peel", "amount": 1, "unit": "twist", "optional": true, "note": "garnish" }
+      ]
+    },
+    {
+      "slug": "espresso-martini",
+      "name": "Espresso Martini",
+      "method": "shaken",
+      "glass": "coupe",
+      "sweetness": 7,
+      "attribution": "Dick Bradsell",
+      "description": "Wake me up, then mess me up.",
+      "instructions": "Shake very hard with ice to build the crema and double-strain into a chilled coupe. Garnish with three coffee beans.",
+      "ingredients": [
+        { "name": "Vodka", "amount": 40, "unit": "ml" },
+        { "name": "Coffee Liqueur", "amount": 20, "unit": "ml" },
+        { "name": "Espresso", "amount": 30, "unit": "ml" },
+        { "name": "Simple Syrup", "amount": 5, "unit": "ml", "optional": true, "note": "to taste" }
+      ]
+    },
+    {
+      "slug": "mojito",
+      "name": "Mojito",
+      "method": "built",
+      "glass": "highball",
+      "sweetness": 7,
+      "attribution": "Classic",
+      "description": "Cuba's minty, fizzy refresher.",
+      "instructions": "Gently muddle the mint with syrup and lime juice, add rum and crushed ice, churn, then top with soda and crown with a mint sprig.",
+      "ingredients": [
+        { "name": "White Rum", "amount": 45, "unit": "ml" },
+        { "name": "Lime Juice", "amount": 25, "unit": "ml" },
+        { "name": "Simple Syrup", "amount": 15, "unit": "ml" },
+        { "name": "Mint", "amount": 8, "unit": "leaf" },
+        { "name": "Soda Water", "unit": "top" }
+      ]
+    },
+    {
+      "slug": "daiquiri",
+      "name": "Daiquiri",
+      "method": "shaken",
+      "glass": "coupe",
+      "sweetness": 5,
+      "attribution": "Classic",
+      "description": "The benchmark rum sour — rum, lime, sugar, nothing to hide behind.",
+      "instructions": "Shake hard with ice and double-strain into a chilled coupe.",
+      "ingredients": [
+        { "name": "White Rum", "amount": 60, "unit": "ml" },
+        { "name": "Lime Juice", "amount": 25, "unit": "ml" },
+        { "name": "Simple Syrup", "amount": 15, "unit": "ml" },
+        { "name": "Lime", "amount": 1, "unit": "wedge", "optional": true, "note": "garnish" }
+      ]
+    },
+    {
+      "slug": "manhattan",
+      "name": "Manhattan",
+      "method": "stirred",
+      "glass": "coupe",
+      "sweetness": 6,
+      "attribution": "Classic",
+      "description": "Rye and sweet vermouth, seasoned with bitters.",
+      "instructions": "Stir over ice until well chilled, strain into a chilled coupe, and garnish with a cocktail cherry.",
+      "ingredients": [
+        { "name": "Rye Whiskey", "amount": 60, "unit": "ml" },
+        { "name": "Sweet Vermouth", "amount": 30, "unit": "ml" },
+        { "name": "Angostura Bitters", "amount": 2, "unit": "dash" },
+        { "name": "Cocktail Cherry", "amount": 1, "unit": "piece", "optional": true, "note": "garnish" }
+      ]
+    },
+    {
+      "slug": "whiskey-sour",
+      "name": "Whiskey Sour",
+      "method": "shaken",
+      "glass": "rocks",
+      "sweetness": 6,
+      "attribution": "Classic",
+      "description": "Bourbon brightened with lemon and softened with silky foam.",
+      "instructions": "Dry-shake without ice to emulsify the egg white, then shake again with ice and strain over fresh ice.",
+      "ingredients": [
+        { "name": "Bourbon", "amount": 60, "unit": "ml" },
+        { "name": "Lemon Juice", "amount": 25, "unit": "ml" },
+        { "name": "Simple Syrup", "amount": 20, "unit": "ml" },
+        { "name": "Egg White", "amount": 30, "unit": "ml", "optional": true, "note": "for the foam" },
+        { "name": "Angostura Bitters", "amount": 2, "unit": "dash", "optional": true, "note": "on the foam" }
+      ]
+    }
+  ]
+}
