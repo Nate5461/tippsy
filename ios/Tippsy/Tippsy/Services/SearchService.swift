@@ -27,8 +27,10 @@ struct SearchService {
             completion([])
             return
         }
-       
-        URLSession.shared.dataTask(with: url) { data, response, error in
+
+        // /search/users requires auth, so attach the token and let
+        // performAuthenticatedRequest detect an expired/invalid session.
+        AuthService.performAuthenticatedRequest(url: url) { data, response, error in
             guard let data = data, error == nil else {
                 print("❌ Error fetching users: \(error?.localizedDescription ?? "Unknown error")")
                 DispatchQueue.main.async { completion([]) }
@@ -41,7 +43,7 @@ struct SearchService {
                 print("Error decoding users: \(error)")
                 DispatchQueue.main.async { completion([]) }
             }
-        }.resume()
+        }
     }
 
     

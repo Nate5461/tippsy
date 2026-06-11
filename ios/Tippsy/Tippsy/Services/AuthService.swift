@@ -46,14 +46,25 @@ struct AuthService {
     static func fetchUserProfile(userId: String, completion: @escaping (Result<(user: User, reviews: [Review]), Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/users/\(userId)") else { return }
 
-        URLSession.shared.dataTask(with: url) { data, _, error in
+        performAuthenticatedRequest(url: url) { data, response, error in
             if let error = error {
                 completion(.failure(error))
                 return
             }
 
+            // A 404 here means the signed-in account no longer exists server-side
+            // (e.g. it was deleted). Treat it like an expired session so the app
+            // logs the user out instead of getting stuck on a broken profile.
+            if let httpResponse = response as? HTTPURLResponse,
+               httpResponse.statusCode == 404 {
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .didReceiveUnauthorized, object: nil)
+                }
+                completion(.failure(NSError(domain: "AuthService", code: 404, userInfo: [NSLocalizedDescriptionKey: "This account no longer exists."])))
+                return
+            }
+
             if let data = data {
-                print("Profile response: \(String(data: data, encoding: .utf8) ?? "No data")") // Debugging
                 do {
                     let response = try JSONDecoder().decode(ProfileResponse.self, from: data)
                     completion(.success((response.user, response.reviews)))
@@ -64,7 +75,7 @@ struct AuthService {
             } else {
                 completion(.failure(NSError(domain: "", code: 400, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
             }
-        }.resume()
+        }
     }
 
 
