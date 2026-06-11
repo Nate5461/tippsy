@@ -70,26 +70,13 @@ struct AccountSetupView: View {
                 }
 
                 Button(action: finishSetup) {
-                    Group {
-                        if isLoading {
-                            ProgressView().tint(.white)
-                        } else {
-                            Text("Finish")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                        }
+                    if isLoading {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Finish")
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        LinearGradient(
-                            colors: [.orange, .red],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(Capsule())
                 }
+                .buttonStyle(GradientCapsuleButtonStyle())
                 .disabled(isLoading || username.trimmingCharacters(in: .whitespaces).isEmpty)
                 .padding(.top, 4)
             }
@@ -99,13 +86,7 @@ struct AccountSetupView: View {
             .padding(.bottom, 40)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background {
-            Image("bar_background")
-                .resizable()
-                .scaledToFill()
-                .overlay(Color.black.opacity(0.55))
-                .ignoresSafeArea()
-        }
+        .barBackground()
         .navigationBarBackButtonHidden(true)
         .sheet(isPresented: $showPhotoPicker) {
             PHPickerViewControllerWrapper(selectedImage: $profileImage)
@@ -172,21 +153,6 @@ struct AccountSetupView: View {
         .padding(4)
         .background(.white.opacity(0.15))
         .clipShape(Capsule())
-    }
-
-    @ViewBuilder
-    private func frostedTextField(_ placeholder: String, text: Binding<String>) -> some View {
-        TextField(
-            placeholder,
-            text: text,
-            prompt: Text(placeholder).foregroundColor(.white.opacity(0.6))
-        )
-        .foregroundColor(.white)
-        .tint(.white)
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(.white.opacity(0.15))
-        .cornerRadius(12)
     }
 
     private func finishSetup() {

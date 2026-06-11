@@ -70,26 +70,13 @@ struct LoginView: View {
 
                     // Primary action button
                     Button(action: primaryAction) {
-                        Group {
-                            if isLoading {
-                                ProgressView().tint(.white)
-                            } else {
-                                Text(isRegistering ? "Create Account" : "Login")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                            }
+                        if isLoading {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text(isRegistering ? "Create Account" : "Login")
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            LinearGradient(
-                                colors: [.orange, .red],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .clipShape(Capsule())
                     }
+                    .buttonStyle(GradientCapsuleButtonStyle())
                     .disabled(isLoading)
                     .padding(.top, 4)
 
@@ -116,13 +103,7 @@ struct LoginView: View {
                 .padding(.bottom, 40)
             }
             .scrollDismissesKeyboard(.interactively)
-            .background {
-                Image("bar_background")
-                    .resizable()
-                    .scaledToFill()
-                    .overlay(Color.black.opacity(0.55))
-                    .ignoresSafeArea()
-            }
+            .barBackground()
             .navigationDestination(for: String.self) { userId in
                 EmailVerificationView(isLoggedIn: $isLoggedIn, userId: userId, email: email)
             }
@@ -132,36 +113,6 @@ struct LoginView: View {
                 Text(alertMessage)
             }
         }
-    }
-
-    @ViewBuilder
-    private func frostedTextField(_ placeholder: String, text: Binding<String>) -> some View {
-        TextField(
-            placeholder,
-            text: text,
-            prompt: Text(placeholder).foregroundColor(.white.opacity(0.6))
-        )
-        .foregroundColor(.white)
-        .tint(.white)
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(.white.opacity(0.15))
-        .cornerRadius(12)
-    }
-
-    @ViewBuilder
-    private func frostedSecureField(_ placeholder: String, text: Binding<String>) -> some View {
-        SecureField(
-            placeholder,
-            text: text,
-            prompt: Text(placeholder).foregroundColor(.white.opacity(0.6))
-        )
-        .foregroundColor(.white)
-        .tint(.white)
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(.white.opacity(0.15))
-        .cornerRadius(12)
     }
 
     private func primaryAction() {
