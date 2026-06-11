@@ -11,7 +11,9 @@ struct User: Codable, Hashable, Identifiable {
     let id: String
     var username: String
     let email: String
+    var displayName: String? = nil
     var profilePicture: String?
+    var measurePref: String? = nil
     var preferences: Preferences
     var followers: [Follower]
     var following: [Follower]

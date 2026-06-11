@@ -15,27 +15,27 @@ struct MainTabView: View {
         TabView {
             HomeView(viewModel: viewModel , isLoggedIn: $isLoggedIn)
                 .tabItem {
-                    Label("Home", systemImage: "house")
+                    Image(systemName: "house")
                 }
-            
+
             DiscoverView()
                 .tabItem {
-                    Label("Search", systemImage: "magnifyingglass")
-                }
-
-            MyBarView()
-                .tabItem {
-                    Label("My Bar", systemImage: "wineglass")
-                }
-
-            ProfileView(viewModel: viewModel, isLoggedIn: $isLoggedIn) // Pass viewModel here
-                .tabItem {
-                    Label("Profile", systemImage: "person")
+                    Image(systemName: "magnifyingglass")
                 }
 
             CreateReviewView()
                 .tabItem {
-                    Label("Write Review", systemImage: "pencil")
+                    Image(systemName: "pencil")
+                }
+
+            MyBarView()
+                .tabItem {
+                    Image(systemName: "waterbottle")
+                }
+
+            ProfileView(viewModel: viewModel, isLoggedIn: $isLoggedIn) // Pass viewModel here
+                .tabItem {
+                    Image(systemName: "person")
                 }
         }
     }

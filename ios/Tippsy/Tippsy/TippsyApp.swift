@@ -37,6 +37,9 @@ struct TippsyApp: App {
             .onReceive(NotificationCenter.default.publisher(for: .didReceiveUnauthorized)) { _ in
                 AuthService.loggedInUserId = nil
                 AuthService.username = nil
+                userViewModel.user = nil
+                userViewModel.reviews = []
+                userViewModel.followingUsers = []
                 userStore.logout()
             }
         }
