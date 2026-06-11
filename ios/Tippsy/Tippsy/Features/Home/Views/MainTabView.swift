@@ -18,17 +18,17 @@ struct MainTabView: View {
                     Image(systemName: "house")
                 }
 
-            DiscoverView()
+            DiscoverView(viewModel: viewModel)
                 .tabItem {
                     Image(systemName: "magnifyingglass")
                 }
 
-            CreateReviewView()
+            CreateRecipeView(viewModel: viewModel)
                 .tabItem {
                     Image(systemName: "pencil")
                 }
 
-            MyBarView()
+            MyBarView(viewModel: viewModel)
                 .tabItem {
                     Image(systemName: "waterbottle")
                 }

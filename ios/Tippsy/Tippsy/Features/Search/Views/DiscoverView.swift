@@ -1,98 +1,242 @@
+//
+//  DiscoverView.swift
+//  Tippsy
+//
+//  Search screen: recipes (with source + ABV filters) and users.
+//
+
 import SwiftUI
 
 struct DiscoverView: View {
     enum SearchCategory {
-        case users, drinks
+        case recipes, users
     }
 
-    @State private var searchCategory: SearchCategory = .users
+    @ObservedObject var viewModel: UserViewModel
+
+    @State private var searchCategory: SearchCategory = .recipes
+    @State private var recipes: [RecipeSummary] = []
     @State private var topUsers: [User] = []
-    @State private var topDrinks: [Drink] = []
     @State private var searchText = ""
+
+    // Filters (recipes segment)
+    @State private var sourceFilter: String? // nil = all, "official", "community"
+    @State private var showFilters = false
+    @State private var abvLimitEnabled = false
+    @State private var abvLimit: Double = 20
+
+    @State private var searchDebounce: DispatchWorkItem?
+
+    private var measurePref: String {
+        viewModel.user?.measurePref ?? "metric"
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack {
+                VStack(spacing: 14) {
                     categorySelector
                     searchBar
-                    if searchCategory == .users {
+
+                    if searchCategory == .recipes {
+                        filterRow
+                        recipeList
+                    } else {
                         userList
-                    } else if searchCategory == .drinks {
-                        drinkList
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
+            .scrollDismissesKeyboard(.interactively)
+            .barBackground()
             .navigationTitle("Discover")
-            .padding(.top, 10)
-            .onAppear {
-                fetchData()
-            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .onAppear(perform: fetchData)
         }
     }
 
-    var categorySelector: some View {
-        HStack {
-            ForEach([("Users", SearchCategory.users), ("Drinks", SearchCategory.drinks)], id: \.1) { label, category in
-                Button(action: {
-                    searchCategory = category
-                    fetchData()
-                }) {
-                    Text(label)
-                        .padding()
-                        .foregroundColor(.white)
-                        .background(
-                            searchCategory == category ?
-                            AnyView(LinearGradient(gradient: Gradient(colors: [Color.blue, Color.purple]), startPoint: .leading, endPoint: .trailing)) :
-                            AnyView(Color.gray.opacity(0.2))
-                        )
-                        .clipShape(Capsule())
-                }
+    // MARK: - Controls
+
+    private var categorySelector: some View {
+        HStack(spacing: 4) {
+            segmentButton("Recipes", category: .recipes)
+            segmentButton("Users", category: .users)
+        }
+        .padding(4)
+        .background(.white.opacity(0.15))
+        .clipShape(Capsule())
+    }
+
+    private func segmentButton(_ label: String, category: SearchCategory) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                searchCategory = category
             }
+            fetchData()
+        } label: {
+            Text(label)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background {
+                    if searchCategory == category {
+                        LinearGradient(colors: [.orange, .red], startPoint: .leading, endPoint: .trailing)
+                    } else {
+                        Color.clear
+                    }
+                }
+                .clipShape(Capsule())
+        }
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.white.opacity(0.6))
+            TextField(
+                "Search...",
+                text: $searchText,
+                prompt: Text("Search...").foregroundColor(.white.opacity(0.6))
+            )
+            .foregroundColor(.white)
+            .tint(.white)
+            .autocorrectionDisabled()
         }
         .padding()
-    }
-
-    var searchBar: some View {
-        HStack {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.gray)
-            TextField("Search...", text: $searchText)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-        }
-        .padding(.horizontal)
-        .onChange(of: searchText) { _ in
-            fetchData()
+        .background(.white.opacity(0.15))
+        .cornerRadius(12)
+        .onChange(of: searchText) { _, _ in
+            debounceFetch()
         }
     }
 
-    var userList: some View {
-        VStack(alignment: .leading) {
-            Text("Users")
-                .font(.headline)
-                .padding(.leading)
+    private var filterRow: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                sourceChip("All", value: nil)
+                sourceChip("Official", value: "official")
+                sourceChip("Community", value: "community")
 
-            LazyVStack {
-                ForEach(topUsers) { user in
-                    NavigationLink(destination: OtherUserProfileView(viewModel: UserViewModel(user: user, isFollowing: isFollowingUser(user)))) {
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(user.username)
-                                    .font(.headline)
-                                Text(user.email)
-                                    .font(.subheadline)
-                                    .foregroundColor(.gray)
-                            }
-                            Spacer()
-                        }
-                        .padding()
-                        .background(LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.2)]), startPoint: .leading, endPoint: .trailing))
-                        .cornerRadius(10)
-                        .shadow(radius: 2)
-                    }
+                Spacer()
+
+                Button {
+                    withAnimation { showFilters.toggle() }
+                } label: {
+                    Image(systemName: abvLimitEnabled ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .font(.title3)
+                        .foregroundColor(abvLimitEnabled ? .orange : .white.opacity(0.7))
                 }
             }
-            .padding(.horizontal)
+
+            if showFilters {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(isOn: $abvLimitEnabled) {
+                        Text(abvLimitEnabled ? "Max strength: \(Int(abvLimit))% ABV" : "Limit strength")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                    }
+                    .tint(.orange)
+                    .onChange(of: abvLimitEnabled) { _, _ in fetchData() }
+
+                    if abvLimitEnabled {
+                        Slider(value: $abvLimit, in: 0...40, step: 1) { editing in
+                            if !editing { fetchData() }
+                        }
+                        .tint(.orange)
+                    }
+                }
+                .frostedCard()
+                .transition(.opacity)
+            }
+        }
+    }
+
+    private func sourceChip(_ label: String, value: String?) -> some View {
+        Button {
+            sourceFilter = value
+            fetchData()
+        } label: {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background {
+                    if sourceFilter == value {
+                        LinearGradient(colors: [.orange, .red], startPoint: .leading, endPoint: .trailing)
+                    } else {
+                        Color.white.opacity(0.15)
+                    }
+                }
+                .clipShape(Capsule())
+        }
+    }
+
+    // MARK: - Results
+
+    private var recipeList: some View {
+        LazyVStack(spacing: 10) {
+            if recipes.isEmpty {
+                Text("No recipes found")
+                    .font(.subheadline)
+                    .italic()
+                    .foregroundColor(.white.opacity(0.6))
+                    .padding(.top, 30)
+            }
+            ForEach(recipes) { recipe in
+                NavigationLink(destination: RecipeDetailView(recipeId: recipe.id, measurePref: measurePref)) {
+                    RecipeCardView(recipe: recipe)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var userList: some View {
+        LazyVStack(spacing: 10) {
+            if topUsers.isEmpty {
+                Text("No users found")
+                    .font(.subheadline)
+                    .italic()
+                    .foregroundColor(.white.opacity(0.6))
+                    .padding(.top, 30)
+            }
+            ForEach(topUsers) { user in
+                NavigationLink(destination: OtherUserProfileView(viewModel: UserViewModel(user: user, isFollowing: isFollowingUser(user)))) {
+                    HStack(spacing: 12) {
+                        AsyncImage(url: URL(string: user.profilePicture ?? "")) { image in
+                            image.resizable().scaledToFill()
+                        } placeholder: {
+                            Image(systemName: "person.crop.circle.fill")
+                                .resizable()
+                                .foregroundColor(.white.opacity(0.4))
+                        }
+                        .frame(width: 44, height: 44)
+                        .clipShape(Circle())
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("@\(user.username)")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            if let displayName = user.displayName, !displayName.isEmpty {
+                                Text(displayName)
+                                    .font(.subheadline)
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                    .frostedCard()
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
@@ -101,55 +245,26 @@ struct DiscoverView: View {
         return user.followers.contains { $0.id == loggedInUserId }
     }
 
-    var drinkList: some View {
-        VStack(alignment: .leading) {
-            Text("Drinks")
-                .font(.headline)
-                .padding(.leading)
+    // MARK: - Data
 
-            LazyVStack {
-                ForEach(topDrinks) { drink in
-                    VStack(alignment: .leading) {
-                        Text(drink.name)
-                            .font(.headline)
-                        Text(drink.category)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-
-                        HStack {
-                            Text("Average Rating: \(String(format: "%.1f", drink.averageRating ?? 0.0))")
-                                .font(.subheadline)
-                                .foregroundColor(.blue)
-
-                            Text("Reviews: \(drink.totalReviews ?? 0)")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                    .padding()
-                    .background(LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.2), Color.purple.opacity(0.2)]), startPoint: .leading, endPoint: .trailing))
-                    .cornerRadius(10)
-                    .shadow(radius: 2)
-                    .padding(.horizontal)
-                }
-            }
-            .padding(.horizontal)
-        }
+    private func debounceFetch() {
+        searchDebounce?.cancel()
+        let task = DispatchWorkItem { fetchData() }
+        searchDebounce = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: task)
     }
 
-    func fetchData() {
+    private func fetchData() {
         switch searchCategory {
+        case .recipes:
+            RecipeService.searchRecipes(
+                query: searchText,
+                source: sourceFilter,
+                maxAbv: abvLimitEnabled ? abvLimit : nil
+            ) { recipes = $0 }
         case .users:
             SearchService.fetchTopUsers(query: searchText) { users in
-                DispatchQueue.main.async {
-                    self.topUsers = searchText.isEmpty ? Array(users.prefix(5)) : users
-                }
-            }
-        case .drinks:
-            SearchService.fetchTopDrinks(query: searchText) { drinks in
-                DispatchQueue.main.async {
-                    self.topDrinks = searchText.isEmpty ? Array(drinks.prefix(5)) : drinks
-                }
+                topUsers = searchText.isEmpty ? Array(users.prefix(5)) : users
             }
         }
     }
@@ -157,6 +272,6 @@ struct DiscoverView: View {
 
 struct DiscoverView_Previews: PreviewProvider {
     static var previews: some View {
-        DiscoverView()
+        DiscoverView(viewModel: UserViewModel())
     }
 }
