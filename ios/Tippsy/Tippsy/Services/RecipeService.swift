@@ -89,7 +89,8 @@ struct RecipeService {
     }
 
     /// Posts a review as multipart/form-data (the photo rides along as JPEG).
-    static func postReview(recipeId: String, rating: Int, comment: String?, impairment: Int?, photo: UIImage?, completion: @escaping (Result<Void, Error>) -> Void) {
+    /// A nil rating logs the drink without scoring it (bare log).
+    static func postReview(recipeId: String, rating: Int?, comment: String?, impairment: Int?, photo: UIImage?, completion: @escaping (Result<Void, Error>) -> Void) {
         guard let url = URL(string: "\(baseURL)/reviews") else { return }
 
         let boundary = UUID().uuidString
@@ -103,8 +104,8 @@ struct RecipeService {
         var body = Data()
         var fields: [(String, String)] = [
             ("recipe_id", recipeId),
-            ("rating", String(rating)),
         ]
+        if let rating { fields.append(("rating", String(rating))) }
         if let comment, !comment.isEmpty { fields.append(("comment", comment)) }
         if let impairment { fields.append(("impairment_level", String(impairment))) }
 

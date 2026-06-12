@@ -56,9 +56,9 @@ struct RecipeCardView: View {
     }
 
     private var subtitle: String {
-        var parts = [recipe.method.capitalized]
-        if let glass = recipe.glass, !glass.isEmpty {
-            parts.append(glass.capitalized)
+        var parts = [recipe.method.capitalized, recipe.glassName]
+        if recipe.parentRecipeId != nil, let parentName = recipe.parentRecipeName {
+            parts.append("based on \(parentName)")
         }
         return parts.joined(separator: " · ")
     }
@@ -75,7 +75,8 @@ struct RecipeCardView: View {
                 .clipShape(Capsule())
         } else {
             VStack(alignment: .trailing, spacing: 2) {
-                Text("COMMUNITY")
+                // A community recipe with a parent is a modified take on it.
+                Text(recipe.parentRecipeId != nil ? "MODIFIED" : "COMMUNITY")
                     .font(.caption2.weight(.bold))
                     .foregroundColor(.white.opacity(0.8))
                     .padding(.horizontal, 8)

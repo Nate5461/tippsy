@@ -10,6 +10,9 @@
 import SwiftUI
 
 struct IngredientPickerSheet: View {
+    /// Restricts the picker to one kind (e.g. "garnish" for the garnish
+    /// sub-section): the chips disappear and "add your own" pins the kind.
+    var lockedKind: String? = nil
     let onSelect: (Ingredient) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -33,7 +36,9 @@ struct IngredientPickerSheet: View {
         NavigationStack {
             VStack(spacing: 12) {
                 searchBar
-                kindChips
+                if lockedKind == nil {
+                    kindChips
+                }
 
                 ScrollView {
                     LazyVStack(spacing: 8) {
@@ -52,7 +57,7 @@ struct IngredientPickerSheet: View {
             }
             .padding(.top, 12)
             .barBackground()
-            .navigationTitle("Add Ingredient")
+            .navigationTitle(lockedKind == "garnish" ? "Add Garnish" : "Add Ingredient")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
@@ -70,7 +75,13 @@ struct IngredientPickerSheet: View {
             } message: {
                 Text(alertMessage)
             }
-            .onAppear { fetch() }
+            .onAppear {
+                if let lockedKind {
+                    selectedKind = lockedKind
+                    newKind = lockedKind
+                }
+                fetch()
+            }
         }
     }
 
@@ -189,18 +200,20 @@ struct IngredientPickerSheet: View {
                 VStack(spacing: 16) {
                     frostedTextField("Name", text: $newName)
 
-                    HStack {
-                        Text("Kind")
-                            .foregroundColor(.white)
-                        Spacer()
-                        Picker("Kind", selection: $newKind) {
-                            ForEach(IngredientKind.ordered, id: \.code) { kind in
-                                Text(kind.label).tag(kind.code)
+                    if lockedKind == nil {
+                        HStack {
+                            Text("Kind")
+                                .foregroundColor(.white)
+                            Spacer()
+                            Picker("Kind", selection: $newKind) {
+                                ForEach(IngredientKind.ordered, id: \.code) { kind in
+                                    Text(kind.label).tag(kind.code)
+                                }
                             }
+                            .tint(.orange)
                         }
-                        .tint(.orange)
+                        .frostedCard()
                     }
-                    .frostedCard()
 
                     frostedTextField("ABV % (optional)", text: $newAbvText)
                         .keyboardType(.decimalPad)

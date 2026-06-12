@@ -45,24 +45,16 @@ struct Follower: Codable, Identifiable, Hashable {
     }
 }
 
+// Mirrors the shared reviewDTO (camelCase). A nil rating is a bare log
+// ("I made this") rather than a scored review.
 struct Review: Codable, Identifiable {
     let id: String?
-    let drinkName: String?
-    let rating: Int
-    let comment: String
-    let impairmentLevel: Int
+    let recipeName: String?
+    let rating: Int?
+    let comment: String?
+    let impairmentLevel: Int?
     let photoUrl: String?
     let userId: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case drinkName
-        case rating
-        case comment
-        case impairmentLevel = "impairment_level" // Map JSON field to Swift property
-        case photoUrl
-        case userId = "user_id"
-    }
 }
 
 struct Preferences: Codable {

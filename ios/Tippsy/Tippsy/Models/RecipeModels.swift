@@ -48,7 +48,7 @@ struct Measure: Codable, Hashable {
     let imperial: String
 }
 
-struct RecipeLine: Codable, Identifiable {
+struct RecipeLine: Codable, Identifiable, Hashable {
     let position: Int
     let ingredientId: String
     let ingredientName: String
@@ -58,6 +58,7 @@ struct RecipeLine: Codable, Identifiable {
     let unit: String?
     let note: String?
     let optional: Bool
+    let garnish: Bool
     let display: Measure
 
     var id: Int { position }
@@ -69,11 +70,14 @@ struct RecipeSummary: Codable, Identifiable, Hashable {
     let name: String
     let description: String?
     let method: String
-    let glass: String?
+    let glass: String // glass_types slug
+    let glassName: String
     let source: String // "official" or "community"
     let authorId: String?
     let authorName: String?
     let attribution: String?
+    let parentRecipeId: String? // set = modified variant of that recipe
+    let parentRecipeName: String?
     let sweetness: Int?
     let estAbv: Double?
     let strength: Int // 1–5; 0 = unknown
@@ -83,17 +87,20 @@ struct RecipeSummary: Codable, Identifiable, Hashable {
     let createdAt: String
 }
 
-struct RecipeDetail: Codable, Identifiable {
+struct RecipeDetail: Codable, Identifiable, Hashable {
     let id: String
     let slug: String
     let name: String
     let description: String?
     let method: String
-    let glass: String?
+    let glass: String
+    let glassName: String
     let source: String
     let authorId: String?
     let authorName: String?
     let attribution: String?
+    let parentRecipeId: String?
+    let parentRecipeName: String?
     let sweetness: Int?
     let estAbv: Double?
     let strength: Int
@@ -105,18 +112,25 @@ struct RecipeDetail: Codable, Identifiable {
     let ingredients: [RecipeLine]
 }
 
-// The recipe-domain review shape (camelCase). The legacy Review struct in
-// Models.swift remains for the older Home/Profile endpoints.
+// The recipe-domain review shape (camelCase). A nil rating is a bare log
+// ("I made this") rather than a scored review.
 struct RecipeReview: Codable, Identifiable {
     let id: String
     let recipeName: String
-    let rating: Int
+    let rating: Int?
     let comment: String?
     let impairmentLevel: Int?
     let photoUrl: String?
     let userId: String
     let username: String
     let createdAt: String
+}
+
+struct GlassType: Codable, Identifiable, Hashable {
+    let slug: String
+    let name: String
+
+    var id: String { slug }
 }
 
 enum RecipeMethod {
@@ -149,4 +163,10 @@ enum IngredientKind {
     static func sortIndex(for code: String) -> Int {
         ordered.firstIndex { $0.code == code } ?? ordered.count
     }
+
+    // Kinds that pour as liquid — these measure in volume units only.
+    static let liquid: Set<String> = [
+        "spirit", "liqueur", "fortified_wine", "wine", "beer_cider",
+        "bitters", "juice", "syrup", "soda_mixer",
+    ]
 }

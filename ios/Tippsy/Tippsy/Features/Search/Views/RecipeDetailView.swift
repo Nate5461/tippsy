@@ -83,6 +83,21 @@ struct RecipeDetailView: View {
                 sourceBadge(recipe)
             }
 
+            if let parentId = recipe.parentRecipeId, let parentName = recipe.parentRecipeName {
+                NavigationLink {
+                    RecipeDetailView(recipeId: parentId, measurePref: measurePref)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.branch")
+                        Text("Based on \(parentName)")
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.orange)
+                }
+            }
+
             if let description = recipe.description, !description.isEmpty {
                 Text(description)
                     .font(.subheadline)
@@ -146,39 +161,58 @@ struct RecipeDetailView: View {
 
     @ViewBuilder
     private func ingredientsCard(_ recipe: RecipeDetail) -> some View {
+        let regular = recipe.ingredients.filter { !$0.garnish }
+        let garnish = recipe.ingredients.filter { $0.garnish }
+
         VStack(alignment: .leading, spacing: 10) {
             Text("Ingredients")
                 .font(.headline)
                 .foregroundColor(.white)
 
-            ForEach(recipe.ingredients) { line in
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(measurePref == "imperial" ? line.display.imperial : line.display.metric)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.orange)
-                        .frame(width: 80, alignment: .leading)
+            ForEach(regular) { line in
+                ingredientLineRow(line)
+            }
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
-                            Text(line.ingredientName)
-                                .font(.subheadline)
-                                .foregroundColor(.white)
-                            if line.optional {
-                                Text("(optional)")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.5))
-                            }
-                        }
-                        if let note = line.note, !note.isEmpty {
-                            Text(note)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.6))
-                        }
-                    }
+            if !garnish.isEmpty {
+                Text("Garnish")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white.opacity(0.85))
+                    .padding(.top, 4)
+
+                ForEach(garnish) { line in
+                    ingredientLineRow(line)
                 }
             }
         }
         .frostedCard()
+    }
+
+    @ViewBuilder
+    private func ingredientLineRow(_ line: RecipeLine) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(measurePref == "imperial" ? line.display.imperial : line.display.metric)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.orange)
+                .frame(width: 80, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(line.ingredientName)
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                    if line.optional {
+                        Text("(optional)")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                }
+                if let note = line.note, !note.isEmpty {
+                    Text(note)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -223,12 +257,19 @@ struct RecipeDetailView: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundColor(.white)
                             Spacer()
-                            HStack(spacing: 2) {
-                                ForEach(1...5, id: \.self) { i in
-                                    Image(systemName: i <= review.rating ? "star.fill" : "star")
-                                        .font(.caption2)
-                                        .foregroundColor(.yellow)
+                            if let rating = review.rating {
+                                HStack(spacing: 2) {
+                                    ForEach(1...5, id: \.self) { i in
+                                        Image(systemName: i <= rating ? "star.fill" : "star")
+                                            .font(.caption2)
+                                            .foregroundColor(.yellow)
+                                    }
                                 }
+                            } else {
+                                Text("logged this")
+                                    .font(.caption)
+                                    .italic()
+                                    .foregroundColor(.white.opacity(0.5))
                             }
                         }
                         if let comment = review.comment, !comment.isEmpty {
@@ -251,8 +292,7 @@ struct RecipeDetailView: View {
     // MARK: - Helpers
 
     private func subtitle(_ recipe: RecipeDetail) -> String {
-        var parts = [recipe.method.capitalized]
-        if let glass = recipe.glass, !glass.isEmpty { parts.append(glass.capitalized) }
+        var parts = [recipe.method.capitalized, recipe.glassName]
         if let attribution = recipe.attribution, !attribution.isEmpty { parts.append(attribution) }
         return parts.joined(separator: " · ")
     }
@@ -267,10 +307,23 @@ struct RecipeDetailView: View {
                 .padding(.vertical, 3)
                 .background(Color.orange)
                 .clipShape(Capsule())
-        } else if let authorName = recipe.authorName {
-            Text("by \(authorName)")
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.6))
+        } else {
+            VStack(alignment: .trailing, spacing: 2) {
+                if recipe.parentRecipeId != nil {
+                    Text("MODIFIED")
+                        .font(.caption2.weight(.bold))
+                        .foregroundColor(.white.opacity(0.8))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.white.opacity(0.2))
+                        .clipShape(Capsule())
+                }
+                if let authorName = recipe.authorName {
+                    Text("by \(authorName)")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
         }
     }
 
@@ -307,7 +360,7 @@ private struct WriteReviewSheet: View {
     let onSubmitted: () -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var rating = 3
+    @State private var rating: Int?
     @State private var comment = ""
     @State private var impairment = 1
     @State private var isSubmitting = false
@@ -324,16 +377,19 @@ private struct WriteReviewSheet: View {
                             .foregroundColor(.white.opacity(0.85))
                         HStack(spacing: 8) {
                             ForEach(1...5, id: \.self) { i in
-                                Image(systemName: i <= rating ? "star.fill" : "star")
+                                Image(systemName: i <= (rating ?? 0) ? "star.fill" : "star")
                                     .font(.title2)
                                     .foregroundColor(.yellow)
-                                    .onTapGesture { rating = i }
+                                    .onTapGesture { rating = rating == i ? nil : i }
                             }
                         }
+                        Text(rating == nil ? "Tap to rate — or just log it" : "Tap the same star to clear")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    frostedTextField("Comment (optional)", text: $comment)
+                    frostedTextField("Say something about it", text: $comment)
 
                     HStack {
                         Text("Impairment level: \(impairment)")
@@ -358,7 +414,7 @@ private struct WriteReviewSheet: View {
                         if isSubmitting {
                             ProgressView().tint(.white)
                         } else {
-                            Text("Submit Review")
+                            Text(rating == nil ? "Log It" : "Submit Review")
                         }
                     }
                     .buttonStyle(GradientCapsuleButtonStyle())

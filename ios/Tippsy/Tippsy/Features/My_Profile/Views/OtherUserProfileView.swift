@@ -71,14 +71,22 @@ struct OtherUserProfileView: View {
                         } else {
                             ForEach(reviews.prefix(3), id: \.id) { review in
                                 VStack(alignment: .leading, spacing: 5) {
-                                    Text("Drink: \(review.drinkName ?? "N/A")")
+                                    Text("Drink: \(review.recipeName ?? "N/A")")
                                         .font(.subheadline)
                                         .fontWeight(.bold)
-                                    Text("Rating: \(review.rating)/5")
-                                        .font(.subheadline)
-                                    Text(review.comment)
-                                        .font(.body)
-                                        .foregroundColor(.secondary)
+                                    if let rating = review.rating {
+                                        Text("Rating: \(rating)/5")
+                                            .font(.subheadline)
+                                    } else {
+                                        Text("Logged this")
+                                            .font(.subheadline)
+                                            .italic()
+                                    }
+                                    if let comment = review.comment, !comment.isEmpty {
+                                        Text(comment)
+                                            .font(.body)
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
                                 .padding()
                                 .background(Color(.systemBackground))
