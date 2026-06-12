@@ -15,12 +15,15 @@ WITH RECURSIVE bar_expanded AS (
     FROM ingredients p
     JOIN bar_expanded c ON c.parent_id = p.id
 )
-SELECT r.*, u.username AS author_name,
+SELECT r.*, u.username AS author_name, g.name AS glass_name,
+       pr.name AS parent_recipe_name,
        COALESCE(AVG(rv.rating), 0)::float8 AS average_rating,
        COUNT(rv.id)                        AS total_reviews
 FROM recipes r
-LEFT JOIN users u    ON u.id = r.author_id
-LEFT JOIN reviews rv ON rv.recipe_id = r.id
+JOIN glass_types g    ON g.slug = r.glass
+LEFT JOIN users u     ON u.id = r.author_id
+LEFT JOIN recipes pr  ON pr.id = r.parent_recipe_id
+LEFT JOIN reviews rv  ON rv.recipe_id = r.id
 WHERE EXISTS (
           SELECT 1 FROM recipe_ingredients ri WHERE ri.recipe_id = r.id
       )
@@ -30,6 +33,6 @@ WHERE EXISTS (
             AND NOT ri.is_optional
             AND ri.ingredient_id NOT IN (SELECT id FROM bar_expanded)
       )
-GROUP BY r.id, u.username
+GROUP BY r.id, u.username, g.name, pr.name
 ORDER BY total_reviews DESC, average_rating DESC, r.name
 LIMIT 100;

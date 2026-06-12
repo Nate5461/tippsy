@@ -11,7 +11,7 @@ import (
 // It lets us map the four sqlc row types through one converter.
 type reviewFields struct {
 	ID              uuid.UUID
-	Rating          int16
+	Rating          *int16
 	Comment         *string
 	ImpairmentLevel *int16
 	PhotoUrl        *string
@@ -86,73 +86,83 @@ func toUnitDTO(u sqlc.Unit) unitDTO {
 	return unitDTO{Code: u.Code, Name: u.Name, Abbrev: u.Abbrev, Kind: string(u.Kind), MlEquiv: u.MlEquiv}
 }
 
+func toGlassDTO(g sqlc.GlassType) glassDTO {
+	return glassDTO{Slug: g.Slug, Name: g.Name}
+}
+
 // --- recipes ---
 
 // recipeSummaryFields is the common set of columns returned by every recipe
 // list/detail query (search, makeable, favourites, get-by-id).
 type recipeSummaryFields struct {
-	ID            uuid.UUID
-	Slug          string
-	Name          string
-	Description   *string
-	Method        sqlc.RecipeMethod
-	Glass         *string
-	Source        sqlc.RecipeSource
-	AuthorID      pgtype.UUID
-	AuthorName    *string
-	Attribution   *string
-	Sweetness     *int16
-	EstAbv        *float64
-	ImageUrl      *string
-	CreatedAt     pgtype.Timestamptz
-	AverageRating float64
-	TotalReviews  int64
+	ID               uuid.UUID
+	Slug             string
+	Name             string
+	Description      *string
+	Method           sqlc.RecipeMethod
+	Glass            string
+	GlassName        string
+	Source           sqlc.RecipeSource
+	AuthorID         pgtype.UUID
+	AuthorName       *string
+	Attribution      *string
+	ParentRecipeID   pgtype.UUID
+	ParentRecipeName *string
+	Sweetness        *int16
+	EstAbv           *float64
+	ImageUrl         *string
+	CreatedAt        pgtype.Timestamptz
+	AverageRating    float64
+	TotalReviews     int64
 }
 
 func (s *Server) toRecipeSummaryDTO(f recipeSummaryFields) recipeSummaryDTO {
 	return recipeSummaryDTO{
-		ID:            f.ID.String(),
-		Slug:          f.Slug,
-		Name:          f.Name,
-		Description:   f.Description,
-		Method:        string(f.Method),
-		Glass:         f.Glass,
-		Source:        string(f.Source),
-		AuthorID:      pgUUIDString(f.AuthorID),
-		AuthorName:    f.AuthorName,
-		Attribution:   f.Attribution,
-		Sweetness:     f.Sweetness,
-		EstAbv:        f.EstAbv,
-		Strength:      recipes.StrengthBand(f.EstAbv),
-		ImageURL:      s.absoluteURL(f.ImageUrl),
-		AverageRating: f.AverageRating,
-		TotalReviews:  f.TotalReviews,
-		CreatedAt:     f.CreatedAt.Time,
+		ID:               f.ID.String(),
+		Slug:             f.Slug,
+		Name:             f.Name,
+		Description:      f.Description,
+		Method:           string(f.Method),
+		Glass:            f.Glass,
+		GlassName:        f.GlassName,
+		Source:           string(f.Source),
+		AuthorID:         pgUUIDString(f.AuthorID),
+		AuthorName:       f.AuthorName,
+		Attribution:      f.Attribution,
+		ParentRecipeID:   pgUUIDString(f.ParentRecipeID),
+		ParentRecipeName: f.ParentRecipeName,
+		Sweetness:        f.Sweetness,
+		EstAbv:           f.EstAbv,
+		Strength:         recipes.StrengthBand(f.EstAbv),
+		ImageURL:         s.absoluteURL(f.ImageUrl),
+		AverageRating:    f.AverageRating,
+		TotalReviews:     f.TotalReviews,
+		CreatedAt:        f.CreatedAt.Time,
 	}
 }
 
 func fieldsFromGetRecipe(r sqlc.GetRecipeByIDRow) recipeSummaryFields {
-	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.Source,
-		r.AuthorID, r.AuthorName, r.Attribution, r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt,
-		r.AverageRating, r.TotalReviews}
+	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.GlassName,
+		r.Source, r.AuthorID, r.AuthorName, r.Attribution, r.ParentRecipeID, r.ParentRecipeName,
+		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews}
 }
 
 func fieldsFromSearchRecipe(r sqlc.SearchRecipesRow) recipeSummaryFields {
-	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.Source,
-		r.AuthorID, r.AuthorName, r.Attribution, r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt,
-		r.AverageRating, r.TotalReviews}
+	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.GlassName,
+		r.Source, r.AuthorID, r.AuthorName, r.Attribution, r.ParentRecipeID, r.ParentRecipeName,
+		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews}
 }
 
 func fieldsFromMakeable(r sqlc.MakeableRecipesRow) recipeSummaryFields {
-	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.Source,
-		r.AuthorID, r.AuthorName, r.Attribution, r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt,
-		r.AverageRating, r.TotalReviews}
+	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.GlassName,
+		r.Source, r.AuthorID, r.AuthorName, r.Attribution, r.ParentRecipeID, r.ParentRecipeName,
+		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews}
 }
 
 func fieldsFromFavourite(r sqlc.ListFavouritesRow) recipeSummaryFields {
-	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.Source,
-		r.AuthorID, r.AuthorName, r.Attribution, r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt,
-		r.AverageRating, r.TotalReviews}
+	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.GlassName,
+		r.Source, r.AuthorID, r.AuthorName, r.Attribution, r.ParentRecipeID, r.ParentRecipeName,
+		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews}
 }
 
 // toRecipeLineDTO renders one structured recipe line, including the measure
@@ -179,6 +189,7 @@ func toRecipeLineDTO(row sqlc.ListRecipeIngredientsRow) recipeLineDTO {
 		Unit:           row.UnitCode,
 		Note:           row.Note,
 		Optional:       row.IsOptional,
+		Garnish:        row.IsGarnish,
 		Display:        measureDTO{Metric: metric, Imperial: imperial},
 	}
 }

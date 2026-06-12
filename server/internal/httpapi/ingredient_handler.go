@@ -44,6 +44,19 @@ func (s *Server) handleListUnits(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+func (s *Server) handleListGlasses(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.q.ListGlassTypes(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not load glass types")
+		return
+	}
+	out := make([]glassDTO, 0, len(rows))
+	for _, g := range rows {
+		out = append(out, toGlassDTO(g))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (s *Server) handleSearchIngredients(w http.ResponseWriter, r *http.Request) {
 	userID, _ := auth.GetUserID(r.Context())
 

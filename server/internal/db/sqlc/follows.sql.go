@@ -40,7 +40,7 @@ ORDER BY rv.created_at DESC
 
 type FollowingReviewsRow struct {
 	ID              uuid.UUID          `json:"id"`
-	Rating          int16              `json:"rating"`
+	Rating          *int16             `json:"rating"`
 	Comment         *string            `json:"comment"`
 	ImpairmentLevel *int16             `json:"impairment_level"`
 	PhotoUrl        *string            `json:"photo_url"`

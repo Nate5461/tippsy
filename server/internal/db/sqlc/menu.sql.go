@@ -23,12 +23,15 @@ WITH RECURSIVE bar_expanded AS (
     FROM ingredients p
     JOIN bar_expanded c ON c.parent_id = p.id
 )
-SELECT r.id, r.slug, r.name, r.description, r.instructions, r.method, r.glass, r.source, r.author_id, r.attribution, r.sweetness, r.est_abv, r.image_url, r.created_at, r.updated_at, u.username AS author_name,
+SELECT r.id, r.slug, r.name, r.description, r.instructions, r.method, r.glass, r.source, r.author_id, r.attribution, r.sweetness, r.est_abv, r.image_url, r.created_at, r.updated_at, r.parent_recipe_id, u.username AS author_name, g.name AS glass_name,
+       pr.name AS parent_recipe_name,
        COALESCE(AVG(rv.rating), 0)::float8 AS average_rating,
        COUNT(rv.id)                        AS total_reviews
 FROM recipes r
-LEFT JOIN users u    ON u.id = r.author_id
-LEFT JOIN reviews rv ON rv.recipe_id = r.id
+JOIN glass_types g    ON g.slug = r.glass
+LEFT JOIN users u     ON u.id = r.author_id
+LEFT JOIN recipes pr  ON pr.id = r.parent_recipe_id
+LEFT JOIN reviews rv  ON rv.recipe_id = r.id
 WHERE EXISTS (
           SELECT 1 FROM recipe_ingredients ri WHERE ri.recipe_id = r.id
       )
@@ -38,30 +41,33 @@ WHERE EXISTS (
             AND NOT ri.is_optional
             AND ri.ingredient_id NOT IN (SELECT id FROM bar_expanded)
       )
-GROUP BY r.id, u.username
+GROUP BY r.id, u.username, g.name, pr.name
 ORDER BY total_reviews DESC, average_rating DESC, r.name
 LIMIT 100
 `
 
 type MakeableRecipesRow struct {
-	ID            uuid.UUID          `json:"id"`
-	Slug          string             `json:"slug"`
-	Name          string             `json:"name"`
-	Description   *string            `json:"description"`
-	Instructions  *string            `json:"instructions"`
-	Method        RecipeMethod       `json:"method"`
-	Glass         *string            `json:"glass"`
-	Source        RecipeSource       `json:"source"`
-	AuthorID      pgtype.UUID        `json:"author_id"`
-	Attribution   *string            `json:"attribution"`
-	Sweetness     *int16             `json:"sweetness"`
-	EstAbv        *float64           `json:"est_abv"`
-	ImageUrl      *string            `json:"image_url"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	AuthorName    *string            `json:"author_name"`
-	AverageRating float64            `json:"average_rating"`
-	TotalReviews  int64              `json:"total_reviews"`
+	ID               uuid.UUID          `json:"id"`
+	Slug             string             `json:"slug"`
+	Name             string             `json:"name"`
+	Description      *string            `json:"description"`
+	Instructions     *string            `json:"instructions"`
+	Method           RecipeMethod       `json:"method"`
+	Glass            string             `json:"glass"`
+	Source           RecipeSource       `json:"source"`
+	AuthorID         pgtype.UUID        `json:"author_id"`
+	Attribution      *string            `json:"attribution"`
+	Sweetness        *int16             `json:"sweetness"`
+	EstAbv           *float64           `json:"est_abv"`
+	ImageUrl         *string            `json:"image_url"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	ParentRecipeID   pgtype.UUID        `json:"parent_recipe_id"`
+	AuthorName       *string            `json:"author_name"`
+	GlassName        string             `json:"glass_name"`
+	ParentRecipeName *string            `json:"parent_recipe_name"`
+	AverageRating    float64            `json:"average_rating"`
+	TotalReviews     int64              `json:"total_reviews"`
 }
 
 // "My Menu": popular recipes the user can make from their bar.
@@ -95,7 +101,10 @@ func (q *Queries) MakeableRecipes(ctx context.Context, userID uuid.UUID) ([]Make
 			&i.ImageUrl,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ParentRecipeID,
 			&i.AuthorName,
+			&i.GlassName,
+			&i.ParentRecipeName,
 			&i.AverageRating,
 			&i.TotalReviews,
 		); err != nil {

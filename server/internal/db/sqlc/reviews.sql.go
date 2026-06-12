@@ -22,7 +22,7 @@ type CreateReviewParams struct {
 	ID              uuid.UUID `json:"id"`
 	UserID          uuid.UUID `json:"user_id"`
 	RecipeID        uuid.UUID `json:"recipe_id"`
-	Rating          int16     `json:"rating"`
+	Rating          *int16    `json:"rating"`
 	Comment         *string   `json:"comment"`
 	ImpairmentLevel *int16    `json:"impairment_level"`
 	PhotoUrl        *string   `json:"photo_url"`
@@ -63,7 +63,7 @@ ORDER BY rv.created_at DESC
 
 type ListReviewsRow struct {
 	ID              uuid.UUID          `json:"id"`
-	Rating          int16              `json:"rating"`
+	Rating          *int16             `json:"rating"`
 	Comment         *string            `json:"comment"`
 	ImpairmentLevel *int16             `json:"impairment_level"`
 	PhotoUrl        *string            `json:"photo_url"`
@@ -115,7 +115,7 @@ ORDER BY rv.created_at DESC
 
 type ListReviewsByRecipeRow struct {
 	ID              uuid.UUID          `json:"id"`
-	Rating          int16              `json:"rating"`
+	Rating          *int16             `json:"rating"`
 	Comment         *string            `json:"comment"`
 	ImpairmentLevel *int16             `json:"impairment_level"`
 	PhotoUrl        *string            `json:"photo_url"`
@@ -167,7 +167,7 @@ ORDER BY rv.created_at DESC
 
 type ListReviewsByUserRow struct {
 	ID              uuid.UUID          `json:"id"`
-	Rating          int16              `json:"rating"`
+	Rating          *int16             `json:"rating"`
 	Comment         *string            `json:"comment"`
 	ImpairmentLevel *int16             `json:"impairment_level"`
 	PhotoUrl        *string            `json:"photo_url"`

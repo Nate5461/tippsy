@@ -94,6 +94,15 @@ func Import(ctx context.Context, q *sqlc.Queries, f File) (Stats, error) {
 		units[u.Code] = u
 	}
 
+	glassRows, err := q.ListGlassTypes(ctx)
+	if err != nil {
+		return stats, fmt.Errorf("load glass types: %w", err)
+	}
+	glasses := make(map[string]bool, len(glassRows))
+	for _, g := range glassRows {
+		glasses[g.Slug] = true
+	}
+
 	// Pass 1: upsert ingredients by name.
 	byName := make(map[string]sqlc.Ingredient, len(f.Ingredients))
 	for _, spec := range f.Ingredients {
@@ -171,6 +180,10 @@ func Import(ctx context.Context, q *sqlc.Queries, f File) (Stats, error) {
 		if spec.Sweetness != nil && (*spec.Sweetness < 0 || *spec.Sweetness > 10) {
 			return stats, fmt.Errorf("recipe %q: sweetness out of range", spec.Slug)
 		}
+		glass := strings.TrimSpace(spec.Glass)
+		if !glasses[glass] {
+			return stats, fmt.Errorf("recipe %q: unknown glass %q", spec.Slug, spec.Glass)
+		}
 		if len(spec.Ingredients) == 0 {
 			return stats, fmt.Errorf("recipe %q: needs at least one ingredient", spec.Slug)
 		}
@@ -201,7 +214,10 @@ func Import(ctx context.Context, q *sqlc.Queries, f File) (Stats, error) {
 				return stats, fmt.Errorf("recipe %q: amount must be positive", spec.Slug)
 			}
 			lines = append(lines, resolvedLine{ingredient: ing, unitCode: unitCode, spec: ls})
-			strengthLines = append(strengthLines, recipes.Line{Ml: recipes.LineMl(ls.Amount, unit), Abv: ing.Abv})
+			// Garnish dresses the drink; it does not count toward its strength.
+			if ing.Kind != sqlc.IngredientKindGarnish {
+				strengthLines = append(strengthLines, recipes.Line{Ml: recipes.LineMl(ls.Amount, unit), Abv: ing.Abv})
+			}
 		}
 
 		var estAbv *float64
@@ -216,7 +232,7 @@ func Import(ctx context.Context, q *sqlc.Queries, f File) (Stats, error) {
 			Description:  optional(spec.Description),
 			Instructions: optional(spec.Instructions),
 			Method:       method,
-			Glass:        optional(spec.Glass),
+			Glass:        glass,
 			Attribution:  optional(spec.Attribution),
 			Sweetness:    spec.Sweetness,
 			EstAbv:       estAbv,
@@ -237,6 +253,7 @@ func Import(ctx context.Context, q *sqlc.Queries, f File) (Stats, error) {
 				UnitCode:     line.unitCode,
 				Note:         optional(line.spec.Note),
 				IsOptional:   line.spec.Optional,
+				IsGarnish:    line.ingredient.Kind == sqlc.IngredientKindGarnish,
 			}); err != nil {
 				return stats, fmt.Errorf("recipe %q: insert line %d: %w", spec.Slug, i+1, err)
 			}

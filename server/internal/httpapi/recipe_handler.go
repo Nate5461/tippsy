@@ -13,6 +13,7 @@ import (
 	"github.com/Nate5461/tippsy/server/internal/recipes"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const maxRecipeLines = 30
@@ -30,26 +31,28 @@ type recipeLineRequest struct {
 	Amount       *float64 `json:"amount"`
 	Unit         *string  `json:"unit"`
 	Note         *string  `json:"note"`
-	Optional     bool     `json:"optional"`
+	Garnish      bool     `json:"garnish"`
 }
 
 type recipePayload struct {
-	Name         string              `json:"name"`
-	Description  *string             `json:"description"`
-	Instructions *string             `json:"instructions"`
-	Method       string              `json:"method"`
-	Glass        *string             `json:"glass"`
-	Sweetness    *int16              `json:"sweetness"`
-	ImageURL     *string             `json:"imageUrl"`
-	Ingredients  []recipeLineRequest `json:"ingredients"`
+	Name           string              `json:"name"`
+	Description    *string             `json:"description"`
+	Instructions   *string             `json:"instructions"`
+	Method         string              `json:"method"`
+	Glass          string              `json:"glass"` // required glass_types slug
+	Sweetness      *int16              `json:"sweetness"`
+	ImageURL       *string             `json:"imageUrl"`
+	ParentRecipeID *string             `json:"parentRecipeId"` // set when publishing a modified variant
+	Ingredients    []recipeLineRequest `json:"ingredients"`
 }
 
 // validatedRecipe is a recipePayload after validation: enum-typed method, the
 // computed strength, and insert-ready lines (RecipeID filled in later).
 type validatedRecipe struct {
-	method sqlc.RecipeMethod
-	estAbv *float64
-	lines  []sqlc.InsertRecipeIngredientParams
+	method   sqlc.RecipeMethod
+	estAbv   *float64
+	parentID pgtype.UUID
+	lines    []sqlc.InsertRecipeIngredientParams
 }
 
 // validateRecipePayload checks the payload against the catalogue (ingredients
@@ -73,6 +76,32 @@ func (s *Server) validateRecipePayload(ctx context.Context, userID uuid.UUID, p 
 	}
 	if len(p.Ingredients) == 0 || len(p.Ingredients) > maxRecipeLines {
 		return v, "a recipe needs between 1 and 30 ingredients"
+	}
+
+	glassRows, err := s.q.ListGlassTypes(ctx)
+	if err != nil {
+		return v, "could not load glass types"
+	}
+	knownGlass := false
+	for _, g := range glassRows {
+		if g.Slug == p.Glass {
+			knownGlass = true
+			break
+		}
+	}
+	if !knownGlass {
+		return v, "glass must be one of the listed glass types"
+	}
+
+	if p.ParentRecipeID != nil {
+		pid, err := uuid.Parse(*p.ParentRecipeID)
+		if err != nil {
+			return v, "parentRecipeId must be a valid recipe id"
+		}
+		if _, err := s.q.GetRecipeByID(ctx, pid); err != nil {
+			return v, "parent recipe not found"
+		}
+		v.parentID = pgUUID(pid)
 	}
 
 	unitRows, err := s.q.ListUnits(ctx)
@@ -101,8 +130,26 @@ func (s *Server) validateRecipePayload(ctx context.Context, userID uuid.UUID, p 
 		ingredients[ing.ID] = ing
 	}
 
-	strengthLines := make([]recipes.Line, 0, len(p.Ingredients))
+	// Regular lines first, then garnish, positions sequential across both, so
+	// garnish always renders as a trailing sub-section regardless of client order.
+	order := make([]int, 0, len(p.Ingredients))
 	for i, line := range p.Ingredients {
+		if !line.Garnish {
+			order = append(order, i)
+		}
+	}
+	if len(order) == 0 {
+		return v, "a recipe needs at least one non-garnish ingredient"
+	}
+	for i, line := range p.Ingredients {
+		if line.Garnish {
+			order = append(order, i)
+		}
+	}
+
+	strengthLines := make([]recipes.Line, 0, len(p.Ingredients))
+	for pos, i := range order {
+		line := p.Ingredients[i]
 		ing, ok := ingredients[ids[i]]
 		if !ok {
 			return v, "ingredient " + line.IngredientID + " does not exist"
@@ -110,6 +157,9 @@ func (s *Server) validateRecipePayload(ctx context.Context, userID uuid.UUID, p 
 		// Custom ingredients are only usable by their creator.
 		if ing.CreatedBy.Valid && uuid.UUID(ing.CreatedBy.Bytes) != userID {
 			return v, "ingredient " + ing.Name + " is not available"
+		}
+		if line.Garnish && ing.Kind != sqlc.IngredientKindGarnish {
+			return v, ing.Name + " cannot be used as a garnish"
 		}
 		if line.Amount != nil && *line.Amount <= 0 {
 			return v, "amounts must be greater than zero"
@@ -122,14 +172,17 @@ func (s *Server) validateRecipePayload(ctx context.Context, userID uuid.UUID, p 
 			}
 			unit = &u
 		}
-		strengthLines = append(strengthLines, recipes.Line{Ml: recipes.LineMl(line.Amount, unit), Abv: ing.Abv})
+		// Garnish dresses the drink; it does not count toward its strength.
+		if !line.Garnish {
+			strengthLines = append(strengthLines, recipes.Line{Ml: recipes.LineMl(line.Amount, unit), Abv: ing.Abv})
+		}
 		v.lines = append(v.lines, sqlc.InsertRecipeIngredientParams{
-			Position:     int16(i + 1),
+			Position:     int16(pos + 1),
 			IngredientID: ids[i],
 			Amount:       line.Amount,
 			UnitCode:     line.Unit,
 			Note:         line.Note,
-			IsOptional:   line.Optional,
+			IsGarnish:    line.Garnish,
 		})
 	}
 
@@ -163,18 +216,19 @@ func (s *Server) handleCreateRecipe(w http.ResponseWriter, r *http.Request) {
 	qtx := s.q.WithTx(tx)
 
 	_, err = qtx.CreateRecipe(r.Context(), sqlc.CreateRecipeParams{
-		ID:           id,
-		Slug:         slugify(p.Name) + "-" + id.String()[:8],
-		Name:         strings.TrimSpace(p.Name),
-		Description:  p.Description,
-		Instructions: p.Instructions,
-		Method:       v.method,
-		Glass:        p.Glass,
-		Source:       sqlc.RecipeSourceCommunity,
-		AuthorID:     pgUUID(userID),
-		Sweetness:    p.Sweetness,
-		EstAbv:       v.estAbv,
-		ImageUrl:     p.ImageURL,
+		ID:             id,
+		Slug:           slugify(p.Name) + "-" + id.String()[:8],
+		Name:           strings.TrimSpace(p.Name),
+		Description:    p.Description,
+		Instructions:   p.Instructions,
+		Method:         v.method,
+		Glass:          p.Glass,
+		Source:         sqlc.RecipeSourceCommunity,
+		AuthorID:       pgUUID(userID),
+		Sweetness:      p.Sweetness,
+		EstAbv:         v.estAbv,
+		ImageUrl:       p.ImageURL,
+		ParentRecipeID: v.parentID,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not create recipe")

@@ -28,10 +28,16 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rating, err := strconv.Atoi(r.FormValue("rating"))
-	if err != nil || rating < 1 || rating > 5 {
-		writeError(w, http.StatusBadRequest, "rating must be an integer between 1 and 5")
-		return
+	// Rating is optional: a review without one is a bare log ("I made this").
+	var rating *int16
+	if raw := strings.TrimSpace(r.FormValue("rating")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > 5 {
+			writeError(w, http.StatusBadRequest, "rating must be an integer between 1 and 5")
+			return
+		}
+		val := int16(n)
+		rating = &val
 	}
 
 	// Confirm the recipe exists so we can return a clean 400 rather than a FK error.
@@ -48,7 +54,7 @@ func (s *Server) handleCreateReview(w http.ResponseWriter, r *http.Request) {
 		ID:              uuid.New(),
 		UserID:          userID,
 		RecipeID:        recipeID,
-		Rating:          int16(rating),
+		Rating:          rating,
 		Comment:         optionalString(r.FormValue("comment")),
 		ImpairmentLevel: optionalInt16(r.FormValue("impairment_level")),
 	}

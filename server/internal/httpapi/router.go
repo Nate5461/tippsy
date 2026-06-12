@@ -51,6 +51,7 @@ func (s *Server) Router() http.Handler {
 		})
 
 		r.Get("/units", s.handleListUnits)
+		r.Get("/glasses", s.handleListGlasses)
 
 		// Ingredient search results include the caller's custom ingredients.
 		r.Route("/ingredients", func(r chi.Router) {
