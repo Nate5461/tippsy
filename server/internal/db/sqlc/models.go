@@ -262,6 +262,12 @@ type Follow struct {
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
+type GlassType struct {
+	Slug      string `json:"slug"`
+	Name      string `json:"name"`
+	SortOrder int16  `json:"sort_order"`
+}
+
 type Ingredient struct {
 	ID          uuid.UUID          `json:"id"`
 	Name        string             `json:"name"`
@@ -274,21 +280,22 @@ type Ingredient struct {
 }
 
 type Recipe struct {
-	ID           uuid.UUID          `json:"id"`
-	Slug         string             `json:"slug"`
-	Name         string             `json:"name"`
-	Description  *string            `json:"description"`
-	Instructions *string            `json:"instructions"`
-	Method       RecipeMethod       `json:"method"`
-	Glass        *string            `json:"glass"`
-	Source       RecipeSource       `json:"source"`
-	AuthorID     pgtype.UUID        `json:"author_id"`
-	Attribution  *string            `json:"attribution"`
-	Sweetness    *int16             `json:"sweetness"`
-	EstAbv       *float64           `json:"est_abv"`
-	ImageUrl     *string            `json:"image_url"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	ID             uuid.UUID          `json:"id"`
+	Slug           string             `json:"slug"`
+	Name           string             `json:"name"`
+	Description    *string            `json:"description"`
+	Instructions   *string            `json:"instructions"`
+	Method         RecipeMethod       `json:"method"`
+	Glass          string             `json:"glass"`
+	Source         RecipeSource       `json:"source"`
+	AuthorID       pgtype.UUID        `json:"author_id"`
+	Attribution    *string            `json:"attribution"`
+	Sweetness      *int16             `json:"sweetness"`
+	EstAbv         *float64           `json:"est_abv"`
+	ImageUrl       *string            `json:"image_url"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ParentRecipeID pgtype.UUID        `json:"parent_recipe_id"`
 }
 
 type RecipeIngredient struct {
@@ -299,13 +306,14 @@ type RecipeIngredient struct {
 	UnitCode     *string   `json:"unit_code"`
 	Note         *string   `json:"note"`
 	IsOptional   bool      `json:"is_optional"`
+	IsGarnish    bool      `json:"is_garnish"`
 }
 
 type Review struct {
 	ID              uuid.UUID          `json:"id"`
 	UserID          uuid.UUID          `json:"user_id"`
 	RecipeID        uuid.UUID          `json:"recipe_id"`
-	Rating          int16              `json:"rating"`
+	Rating          *int16             `json:"rating"`
 	Comment         *string            `json:"comment"`
 	ImpairmentLevel *int16             `json:"impairment_level"`
 	PhotoUrl        *string            `json:"photo_url"`

@@ -14,25 +14,27 @@ import (
 
 const createRecipe = `-- name: CreateRecipe :one
 INSERT INTO recipes (id, slug, name, description, instructions, method, glass,
-                     source, author_id, attribution, sweetness, est_abv, image_url)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, slug, name, description, instructions, method, glass, source, author_id, attribution, sweetness, est_abv, image_url, created_at, updated_at
+                     source, author_id, attribution, sweetness, est_abv, image_url,
+                     parent_recipe_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+RETURNING id, slug, name, description, instructions, method, glass, source, author_id, attribution, sweetness, est_abv, image_url, created_at, updated_at, parent_recipe_id
 `
 
 type CreateRecipeParams struct {
-	ID           uuid.UUID    `json:"id"`
-	Slug         string       `json:"slug"`
-	Name         string       `json:"name"`
-	Description  *string      `json:"description"`
-	Instructions *string      `json:"instructions"`
-	Method       RecipeMethod `json:"method"`
-	Glass        *string      `json:"glass"`
-	Source       RecipeSource `json:"source"`
-	AuthorID     pgtype.UUID  `json:"author_id"`
-	Attribution  *string      `json:"attribution"`
-	Sweetness    *int16       `json:"sweetness"`
-	EstAbv       *float64     `json:"est_abv"`
-	ImageUrl     *string      `json:"image_url"`
+	ID             uuid.UUID    `json:"id"`
+	Slug           string       `json:"slug"`
+	Name           string       `json:"name"`
+	Description    *string      `json:"description"`
+	Instructions   *string      `json:"instructions"`
+	Method         RecipeMethod `json:"method"`
+	Glass          string       `json:"glass"`
+	Source         RecipeSource `json:"source"`
+	AuthorID       pgtype.UUID  `json:"author_id"`
+	Attribution    *string      `json:"attribution"`
+	Sweetness      *int16       `json:"sweetness"`
+	EstAbv         *float64     `json:"est_abv"`
+	ImageUrl       *string      `json:"image_url"`
+	ParentRecipeID pgtype.UUID  `json:"parent_recipe_id"`
 }
 
 func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Recipe, error) {
@@ -50,6 +52,7 @@ func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Rec
 		arg.Sweetness,
 		arg.EstAbv,
 		arg.ImageUrl,
+		arg.ParentRecipeID,
 	)
 	var i Recipe
 	err := row.Scan(
@@ -68,6 +71,7 @@ func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Rec
 		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentRecipeID,
 	)
 	return i, err
 }
@@ -100,35 +104,41 @@ func (q *Queries) DeleteRecipeIngredients(ctx context.Context, recipeID uuid.UUI
 }
 
 const getRecipeByID = `-- name: GetRecipeByID :one
-SELECT r.id, r.slug, r.name, r.description, r.instructions, r.method, r.glass, r.source, r.author_id, r.attribution, r.sweetness, r.est_abv, r.image_url, r.created_at, r.updated_at, u.username AS author_name,
+SELECT r.id, r.slug, r.name, r.description, r.instructions, r.method, r.glass, r.source, r.author_id, r.attribution, r.sweetness, r.est_abv, r.image_url, r.created_at, r.updated_at, r.parent_recipe_id, u.username AS author_name, g.name AS glass_name,
+       pr.name AS parent_recipe_name,
        COALESCE(AVG(rv.rating), 0)::float8 AS average_rating,
        COUNT(rv.id)                        AS total_reviews
 FROM recipes r
-LEFT JOIN users u    ON u.id = r.author_id
-LEFT JOIN reviews rv ON rv.recipe_id = r.id
+JOIN glass_types g    ON g.slug = r.glass
+LEFT JOIN users u     ON u.id = r.author_id
+LEFT JOIN recipes pr  ON pr.id = r.parent_recipe_id
+LEFT JOIN reviews rv  ON rv.recipe_id = r.id
 WHERE r.id = $1
-GROUP BY r.id, u.username
+GROUP BY r.id, u.username, g.name, pr.name
 `
 
 type GetRecipeByIDRow struct {
-	ID            uuid.UUID          `json:"id"`
-	Slug          string             `json:"slug"`
-	Name          string             `json:"name"`
-	Description   *string            `json:"description"`
-	Instructions  *string            `json:"instructions"`
-	Method        RecipeMethod       `json:"method"`
-	Glass         *string            `json:"glass"`
-	Source        RecipeSource       `json:"source"`
-	AuthorID      pgtype.UUID        `json:"author_id"`
-	Attribution   *string            `json:"attribution"`
-	Sweetness     *int16             `json:"sweetness"`
-	EstAbv        *float64           `json:"est_abv"`
-	ImageUrl      *string            `json:"image_url"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	AuthorName    *string            `json:"author_name"`
-	AverageRating float64            `json:"average_rating"`
-	TotalReviews  int64              `json:"total_reviews"`
+	ID               uuid.UUID          `json:"id"`
+	Slug             string             `json:"slug"`
+	Name             string             `json:"name"`
+	Description      *string            `json:"description"`
+	Instructions     *string            `json:"instructions"`
+	Method           RecipeMethod       `json:"method"`
+	Glass            string             `json:"glass"`
+	Source           RecipeSource       `json:"source"`
+	AuthorID         pgtype.UUID        `json:"author_id"`
+	Attribution      *string            `json:"attribution"`
+	Sweetness        *int16             `json:"sweetness"`
+	EstAbv           *float64           `json:"est_abv"`
+	ImageUrl         *string            `json:"image_url"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	ParentRecipeID   pgtype.UUID        `json:"parent_recipe_id"`
+	AuthorName       *string            `json:"author_name"`
+	GlassName        string             `json:"glass_name"`
+	ParentRecipeName *string            `json:"parent_recipe_name"`
+	AverageRating    float64            `json:"average_rating"`
+	TotalReviews     int64              `json:"total_reviews"`
 }
 
 func (q *Queries) GetRecipeByID(ctx context.Context, id uuid.UUID) (GetRecipeByIDRow, error) {
@@ -150,7 +160,10 @@ func (q *Queries) GetRecipeByID(ctx context.Context, id uuid.UUID) (GetRecipeByI
 		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentRecipeID,
 		&i.AuthorName,
+		&i.GlassName,
+		&i.ParentRecipeName,
 		&i.AverageRating,
 		&i.TotalReviews,
 	)
@@ -158,8 +171,8 @@ func (q *Queries) GetRecipeByID(ctx context.Context, id uuid.UUID) (GetRecipeByI
 }
 
 const insertRecipeIngredient = `-- name: InsertRecipeIngredient :exec
-INSERT INTO recipe_ingredients (recipe_id, position, ingredient_id, amount, unit_code, note, is_optional)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO recipe_ingredients (recipe_id, position, ingredient_id, amount, unit_code, note, is_optional, is_garnish)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
 type InsertRecipeIngredientParams struct {
@@ -170,6 +183,7 @@ type InsertRecipeIngredientParams struct {
 	UnitCode     *string   `json:"unit_code"`
 	Note         *string   `json:"note"`
 	IsOptional   bool      `json:"is_optional"`
+	IsGarnish    bool      `json:"is_garnish"`
 }
 
 func (q *Queries) InsertRecipeIngredient(ctx context.Context, arg InsertRecipeIngredientParams) error {
@@ -181,12 +195,13 @@ func (q *Queries) InsertRecipeIngredient(ctx context.Context, arg InsertRecipeIn
 		arg.UnitCode,
 		arg.Note,
 		arg.IsOptional,
+		arg.IsGarnish,
 	)
 	return err
 }
 
 const listRecipeIngredients = `-- name: ListRecipeIngredients :many
-SELECT ri.position, ri.amount, ri.unit_code, ri.note, ri.is_optional,
+SELECT ri.position, ri.amount, ri.unit_code, ri.note, ri.is_optional, ri.is_garnish,
        un.name AS unit_name, un.abbrev AS unit_abbrev, un.kind AS unit_kind, un.ml_equiv,
        i.id AS ingredient_id, i.name AS ingredient_name,
        i.kind AS ingredient_kind, i.abv
@@ -203,6 +218,7 @@ type ListRecipeIngredientsRow struct {
 	UnitCode       *string        `json:"unit_code"`
 	Note           *string        `json:"note"`
 	IsOptional     bool           `json:"is_optional"`
+	IsGarnish      bool           `json:"is_garnish"`
 	UnitName       *string        `json:"unit_name"`
 	UnitAbbrev     *string        `json:"unit_abbrev"`
 	UnitKind       *UnitKind      `json:"unit_kind"`
@@ -228,6 +244,7 @@ func (q *Queries) ListRecipeIngredients(ctx context.Context, recipeID uuid.UUID)
 			&i.UnitCode,
 			&i.Note,
 			&i.IsOptional,
+			&i.IsGarnish,
 			&i.UnitName,
 			&i.UnitAbbrev,
 			&i.UnitKind,
@@ -248,16 +265,19 @@ func (q *Queries) ListRecipeIngredients(ctx context.Context, recipeID uuid.UUID)
 }
 
 const searchRecipes = `-- name: SearchRecipes :many
-SELECT r.id, r.slug, r.name, r.description, r.instructions, r.method, r.glass, r.source, r.author_id, r.attribution, r.sweetness, r.est_abv, r.image_url, r.created_at, r.updated_at, u.username AS author_name,
+SELECT r.id, r.slug, r.name, r.description, r.instructions, r.method, r.glass, r.source, r.author_id, r.attribution, r.sweetness, r.est_abv, r.image_url, r.created_at, r.updated_at, r.parent_recipe_id, u.username AS author_name, g.name AS glass_name,
+       pr.name AS parent_recipe_name,
        COALESCE(AVG(rv.rating), 0)::float8 AS average_rating,
        COUNT(rv.id)                        AS total_reviews
 FROM recipes r
-LEFT JOIN users u    ON u.id = r.author_id
-LEFT JOIN reviews rv ON rv.recipe_id = r.id
+JOIN glass_types g    ON g.slug = r.glass
+LEFT JOIN users u     ON u.id = r.author_id
+LEFT JOIN recipes pr  ON pr.id = r.parent_recipe_id
+LEFT JOIN reviews rv  ON rv.recipe_id = r.id
 WHERE r.name ILIKE $1
   AND ($2::recipe_source IS NULL OR r.source = $2)
   AND ($3::float8 IS NULL OR r.est_abv <= $3)
-GROUP BY r.id, u.username
+GROUP BY r.id, u.username, g.name, pr.name
 ORDER BY total_reviews DESC, average_rating DESC, r.name
 LIMIT 100
 `
@@ -269,24 +289,27 @@ type SearchRecipesParams struct {
 }
 
 type SearchRecipesRow struct {
-	ID            uuid.UUID          `json:"id"`
-	Slug          string             `json:"slug"`
-	Name          string             `json:"name"`
-	Description   *string            `json:"description"`
-	Instructions  *string            `json:"instructions"`
-	Method        RecipeMethod       `json:"method"`
-	Glass         *string            `json:"glass"`
-	Source        RecipeSource       `json:"source"`
-	AuthorID      pgtype.UUID        `json:"author_id"`
-	Attribution   *string            `json:"attribution"`
-	Sweetness     *int16             `json:"sweetness"`
-	EstAbv        *float64           `json:"est_abv"`
-	ImageUrl      *string            `json:"image_url"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	AuthorName    *string            `json:"author_name"`
-	AverageRating float64            `json:"average_rating"`
-	TotalReviews  int64              `json:"total_reviews"`
+	ID               uuid.UUID          `json:"id"`
+	Slug             string             `json:"slug"`
+	Name             string             `json:"name"`
+	Description      *string            `json:"description"`
+	Instructions     *string            `json:"instructions"`
+	Method           RecipeMethod       `json:"method"`
+	Glass            string             `json:"glass"`
+	Source           RecipeSource       `json:"source"`
+	AuthorID         pgtype.UUID        `json:"author_id"`
+	Attribution      *string            `json:"attribution"`
+	Sweetness        *int16             `json:"sweetness"`
+	EstAbv           *float64           `json:"est_abv"`
+	ImageUrl         *string            `json:"image_url"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	ParentRecipeID   pgtype.UUID        `json:"parent_recipe_id"`
+	AuthorName       *string            `json:"author_name"`
+	GlassName        string             `json:"glass_name"`
+	ParentRecipeName *string            `json:"parent_recipe_name"`
+	AverageRating    float64            `json:"average_rating"`
+	TotalReviews     int64              `json:"total_reviews"`
 }
 
 // Search doubles as the popularity-ranked browse list when the pattern is '%%'.
@@ -315,7 +338,10 @@ func (q *Queries) SearchRecipes(ctx context.Context, arg SearchRecipesParams) ([
 			&i.ImageUrl,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ParentRecipeID,
 			&i.AuthorName,
+			&i.GlassName,
+			&i.ParentRecipeName,
 			&i.AverageRating,
 			&i.TotalReviews,
 		); err != nil {
@@ -340,7 +366,7 @@ SET name         = $1,
     est_abv      = $7,
     image_url    = $8
 WHERE id = $9 AND author_id = $10 AND source = 'community'
-RETURNING id, slug, name, description, instructions, method, glass, source, author_id, attribution, sweetness, est_abv, image_url, created_at, updated_at
+RETURNING id, slug, name, description, instructions, method, glass, source, author_id, attribution, sweetness, est_abv, image_url, created_at, updated_at, parent_recipe_id
 `
 
 type UpdateRecipeParams struct {
@@ -348,7 +374,7 @@ type UpdateRecipeParams struct {
 	Description  *string      `json:"description"`
 	Instructions *string      `json:"instructions"`
 	Method       RecipeMethod `json:"method"`
-	Glass        *string      `json:"glass"`
+	Glass        string       `json:"glass"`
 	Sweetness    *int16       `json:"sweetness"`
 	EstAbv       *float64     `json:"est_abv"`
 	ImageUrl     *string      `json:"image_url"`
@@ -388,6 +414,7 @@ func (q *Queries) UpdateRecipe(ctx context.Context, arg UpdateRecipeParams) (Rec
 		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentRecipeID,
 	)
 	return i, err
 }
@@ -407,7 +434,7 @@ DO UPDATE SET name         = EXCLUDED.name,
               sweetness    = EXCLUDED.sweetness,
               est_abv      = EXCLUDED.est_abv,
               image_url    = EXCLUDED.image_url
-RETURNING id, slug, name, description, instructions, method, glass, source, author_id, attribution, sweetness, est_abv, image_url, created_at, updated_at
+RETURNING id, slug, name, description, instructions, method, glass, source, author_id, attribution, sweetness, est_abv, image_url, created_at, updated_at, parent_recipe_id
 `
 
 type UpsertRecipeBySlugParams struct {
@@ -417,7 +444,7 @@ type UpsertRecipeBySlugParams struct {
 	Description  *string      `json:"description"`
 	Instructions *string      `json:"instructions"`
 	Method       RecipeMethod `json:"method"`
-	Glass        *string      `json:"glass"`
+	Glass        string       `json:"glass"`
 	Attribution  *string      `json:"attribution"`
 	Sweetness    *int16       `json:"sweetness"`
 	EstAbv       *float64     `json:"est_abv"`
@@ -457,6 +484,7 @@ func (q *Queries) UpsertRecipeBySlug(ctx context.Context, arg UpsertRecipeBySlug
 		&i.ImageUrl,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ParentRecipeID,
 	)
 	return i, err
 }

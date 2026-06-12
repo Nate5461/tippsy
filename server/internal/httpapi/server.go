@@ -79,7 +79,7 @@ type userDTO struct {
 type reviewDTO struct {
 	ID              string    `json:"id"`
 	RecipeName      string    `json:"recipeName"`
-	Rating          int16     `json:"rating"`
+	Rating          *int16    `json:"rating"` // null = bare log ("I made this")
 	Comment         *string   `json:"comment"`
 	ImpairmentLevel *int16    `json:"impairmentLevel"`
 	PhotoURL        *string   `json:"photoUrl"`
@@ -106,6 +106,11 @@ type unitDTO struct {
 	MlEquiv *float64 `json:"mlEquiv"`
 }
 
+type glassDTO struct {
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+}
+
 type barItemDTO struct {
 	ingredientDTO
 	AddedAt time.Time `json:"addedAt"`
@@ -128,27 +133,31 @@ type recipeLineDTO struct {
 	Unit           *string    `json:"unit"`
 	Note           *string    `json:"note"`
 	Optional       bool       `json:"optional"`
+	Garnish        bool       `json:"garnish"` // rendered in the garnish sub-section
 	Display        measureDTO `json:"display"`
 }
 
 type recipeSummaryDTO struct {
-	ID            string    `json:"id"`
-	Slug          string    `json:"slug"`
-	Name          string    `json:"name"`
-	Description   *string   `json:"description"`
-	Method        string    `json:"method"`
-	Glass         *string   `json:"glass"`
-	Source        string    `json:"source"`
-	AuthorID      *string   `json:"authorId"`   // null = Tippsy official
-	AuthorName    *string   `json:"authorName"` // null = Tippsy official
-	Attribution   *string   `json:"attribution"`
-	Sweetness     *int16    `json:"sweetness"` // author-set 0 (bone dry) – 10 (dessert)
-	EstAbv        *float64  `json:"estAbv"`
-	Strength      int       `json:"strength"` // 1–5 meter; 0 = unknown
-	ImageURL      *string   `json:"imageUrl"`
-	AverageRating float64   `json:"averageRating"`
-	TotalReviews  int64     `json:"totalReviews"`
-	CreatedAt     time.Time `json:"createdAt"`
+	ID               string    `json:"id"`
+	Slug             string    `json:"slug"`
+	Name             string    `json:"name"`
+	Description      *string   `json:"description"`
+	Method           string    `json:"method"`
+	Glass            string    `json:"glass"`     // glass_types slug
+	GlassName        string    `json:"glassName"` // display name for the slug
+	Source           string    `json:"source"`
+	AuthorID         *string   `json:"authorId"`   // null = Tippsy official
+	AuthorName       *string   `json:"authorName"` // null = Tippsy official
+	Attribution      *string   `json:"attribution"`
+	ParentRecipeID   *string   `json:"parentRecipeId"` // set = modified variant of that recipe
+	ParentRecipeName *string   `json:"parentRecipeName"`
+	Sweetness        *int16    `json:"sweetness"` // author-set 0 (bone dry) – 10 (dessert)
+	EstAbv           *float64  `json:"estAbv"`
+	Strength         int       `json:"strength"` // 1–5 meter; 0 = unknown
+	ImageURL         *string   `json:"imageUrl"`
+	AverageRating    float64   `json:"averageRating"`
+	TotalReviews     int64     `json:"totalReviews"`
+	CreatedAt        time.Time `json:"createdAt"`
 }
 
 type recipeDetailDTO struct {
