@@ -23,7 +23,7 @@ struct MainTabView: View {
                     Image(systemName: "magnifyingglass")
                 }
 
-            CreateRecipeView(viewModel: viewModel)
+            LogDrinkLandingView(viewModel: viewModel)
                 .tabItem {
                     Image(systemName: "pencil")
                 }
