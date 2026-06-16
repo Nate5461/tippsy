@@ -29,7 +29,7 @@ func (q *Queries) AddBarItem(ctx context.Context, arg AddBarItemParams) error {
 }
 
 const listBarItems = `-- name: ListBarItems :many
-SELECT b.created_at AS added_at, i.id, i.name, i.kind, i.parent_id, i.abv, i.description, i.created_by, i.created_at
+SELECT b.created_at AS added_at, i.id, i.name, i.kind, i.parent_id, i.abv, i.description, i.created_by, i.created_at, i.popularity, i.image_url
 FROM bar_items b
 JOIN ingredients i ON i.id = b.ingredient_id
 WHERE b.user_id = $1
@@ -46,6 +46,8 @@ type ListBarItemsRow struct {
 	Description *string            `json:"description"`
 	CreatedBy   pgtype.UUID        `json:"created_by"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	Popularity  int32              `json:"popularity"`
+	ImageUrl    *string            `json:"image_url"`
 }
 
 func (q *Queries) ListBarItems(ctx context.Context, userID uuid.UUID) ([]ListBarItemsRow, error) {
@@ -67,6 +69,8 @@ func (q *Queries) ListBarItems(ctx context.Context, userID uuid.UUID) ([]ListBar
 			&i.Description,
 			&i.CreatedBy,
 			&i.CreatedAt,
+			&i.Popularity,
+			&i.ImageUrl,
 		); err != nil {
 			return nil, err
 		}

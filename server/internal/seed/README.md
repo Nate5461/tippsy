@@ -42,6 +42,13 @@ Field notes:
 - **parent**: name of the generic this ingredient is a brand/style of
   (`Grey Goose` → `Vodka`). Owning the brand satisfies recipes that call for
   the generic. The parent may live in the same file or already in the catalogue.
+- **popularity**: integer (default 0); higher floats the ingredient up the
+  add-to-bar browse grid. Only meaningful for top-level generics (no `parent`) —
+  e.g. `Vodka` 100, `Bourbon` 95 — so the common spirits lead. Brands keep 0.
+- **imageUrl**: optional relative path under `/uploads`
+  (e.g. `/uploads/bottles/vodka.png`), returned as an absolute URL like recipe
+  images. Artwork is phased in later; omit it and the client shows a category
+  icon placeholder. Re-seeding without it preserves any art already attached.
 - **method**: `shaken`, `stirred`, `built`, `blended`, `other` (default
   `stirred`). Drives the dilution factor in the strength estimate.
 - **unit**: a code from the `units` table — volume: `ml`, `cl`, `oz`, `tsp`,

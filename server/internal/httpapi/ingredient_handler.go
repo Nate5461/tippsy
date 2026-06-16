@@ -57,30 +57,61 @@ func (s *Server) handleListGlasses(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+// handleSearchIngredients backs GET /ingredients in three modes, resolved in
+// priority order:
+//   - ?parentId=<uuid> lists the brands/styles under a generic (the drill-in);
+//   - ?topLevel=true   lists the top-level generics for the browse grid, most
+//     common first;
+//   - otherwise        it is a free-text catalogue search (the long tail).
+//
+// An optional ?kind filters the grid and search modes.
 func (s *Server) handleSearchIngredients(w http.ResponseWriter, r *http.Request) {
 	userID, _ := auth.GetUserID(r.Context())
+	query := r.URL.Query()
 
-	params := sqlc.SearchIngredientsParams{
-		Viewer:  pgUUID(userID),
-		Pattern: "%" + r.URL.Query().Get("query") + "%",
-	}
-	if raw := r.URL.Query().Get("kind"); raw != "" {
-		kind, ok := ingredientKinds[raw]
+	var kind *sqlc.IngredientKind
+	if raw := query.Get("kind"); raw != "" {
+		k, ok := ingredientKinds[raw]
 		if !ok {
 			writeError(w, http.StatusBadRequest, "unknown ingredient kind")
 			return
 		}
-		params.Kind = &kind
+		kind = &k
 	}
 
-	rows, err := s.q.SearchIngredients(r.Context(), params)
+	var rows []sqlc.Ingredient
+	var err error
+	switch {
+	case query.Get("parentId") != "": // brands under a generic
+		parentID, perr := uuid.Parse(query.Get("parentId"))
+		if perr != nil {
+			writeError(w, http.StatusBadRequest, "invalid parentId")
+			return
+		}
+		rows, err = s.q.ListIngredientChildren(r.Context(), sqlc.ListIngredientChildrenParams{
+			Parent: pgUUID(parentID),
+			Viewer: pgUUID(userID),
+		})
+	case query.Get("topLevel") == "true": // most-common browse grid
+		rows, err = s.q.ListTopLevelIngredients(r.Context(), sqlc.ListTopLevelIngredientsParams{
+			Viewer: pgUUID(userID),
+			Kind:   kind,
+		})
+	default: // free-text search (long tail)
+		rows, err = s.q.SearchIngredients(r.Context(), sqlc.SearchIngredientsParams{
+			Viewer:  pgUUID(userID),
+			Pattern: "%" + query.Get("query") + "%",
+			Kind:    kind,
+		})
+	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not search ingredients")
+		writeError(w, http.StatusInternalServerError, "could not load ingredients")
 		return
 	}
+
 	out := make([]ingredientDTO, 0, len(rows))
 	for _, i := range rows {
-		out = append(out, toIngredientDTO(i))
+		out = append(out, s.toIngredientDTO(i))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -165,5 +196,5 @@ func (s *Server) handleCreateIngredient(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, "could not create ingredient")
 		return
 	}
-	writeJSON(w, http.StatusCreated, toIngredientDTO(ing))
+	writeJSON(w, http.StatusCreated, s.toIngredientDTO(ing))
 }

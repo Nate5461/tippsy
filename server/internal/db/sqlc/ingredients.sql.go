@@ -15,7 +15,7 @@ import (
 const createIngredient = `-- name: CreateIngredient :one
 INSERT INTO ingredients (id, name, kind, parent_id, abv, description, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, name, kind, parent_id, abv, description, created_by, created_at
+RETURNING id, name, kind, parent_id, abv, description, created_by, created_at, popularity, image_url
 `
 
 type CreateIngredientParams struct {
@@ -48,12 +48,14 @@ func (q *Queries) CreateIngredient(ctx context.Context, arg CreateIngredientPara
 		&i.Description,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.Popularity,
+		&i.ImageUrl,
 	)
 	return i, err
 }
 
 const getIngredient = `-- name: GetIngredient :one
-SELECT id, name, kind, parent_id, abv, description, created_by, created_at FROM ingredients WHERE id = $1
+SELECT id, name, kind, parent_id, abv, description, created_by, created_at, popularity, image_url FROM ingredients WHERE id = $1
 `
 
 func (q *Queries) GetIngredient(ctx context.Context, id uuid.UUID) (Ingredient, error) {
@@ -68,12 +70,14 @@ func (q *Queries) GetIngredient(ctx context.Context, id uuid.UUID) (Ingredient, 
 		&i.Description,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.Popularity,
+		&i.ImageUrl,
 	)
 	return i, err
 }
 
 const getIngredientsByIDs = `-- name: GetIngredientsByIDs :many
-SELECT id, name, kind, parent_id, abv, description, created_by, created_at FROM ingredients WHERE id = ANY($1::uuid[])
+SELECT id, name, kind, parent_id, abv, description, created_by, created_at, popularity, image_url FROM ingredients WHERE id = ANY($1::uuid[])
 `
 
 func (q *Queries) GetIngredientsByIDs(ctx context.Context, ids []uuid.UUID) ([]Ingredient, error) {
@@ -94,6 +98,8 @@ func (q *Queries) GetIngredientsByIDs(ctx context.Context, ids []uuid.UUID) ([]I
 			&i.Description,
 			&i.CreatedBy,
 			&i.CreatedAt,
+			&i.Popularity,
+			&i.ImageUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -106,7 +112,7 @@ func (q *Queries) GetIngredientsByIDs(ctx context.Context, ids []uuid.UUID) ([]I
 }
 
 const getOfficialIngredientByName = `-- name: GetOfficialIngredientByName :one
-SELECT id, name, kind, parent_id, abv, description, created_by, created_at FROM ingredients
+SELECT id, name, kind, parent_id, abv, description, created_by, created_at, popularity, image_url FROM ingredients
 WHERE lower(name) = lower($1) AND created_by IS NULL
 `
 
@@ -122,8 +128,100 @@ func (q *Queries) GetOfficialIngredientByName(ctx context.Context, name string) 
 		&i.Description,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.Popularity,
+		&i.ImageUrl,
 	)
 	return i, err
+}
+
+const listIngredientChildren = `-- name: ListIngredientChildren :many
+SELECT id, name, kind, parent_id, abv, description, created_by, created_at, popularity, image_url FROM ingredients
+WHERE parent_id = $1
+  AND (created_by IS NULL OR created_by = $2)
+ORDER BY name
+`
+
+type ListIngredientChildrenParams struct {
+	Parent pgtype.UUID `json:"parent"`
+	Viewer pgtype.UUID `json:"viewer"`
+}
+
+// Brands/styles under one generic (Vodka -> Grey Goose, Tito's), alphabetical.
+func (q *Queries) ListIngredientChildren(ctx context.Context, arg ListIngredientChildrenParams) ([]Ingredient, error) {
+	rows, err := q.db.Query(ctx, listIngredientChildren, arg.Parent, arg.Viewer)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Ingredient
+	for rows.Next() {
+		var i Ingredient
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Kind,
+			&i.ParentID,
+			&i.Abv,
+			&i.Description,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.Popularity,
+			&i.ImageUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTopLevelIngredients = `-- name: ListTopLevelIngredients :many
+SELECT id, name, kind, parent_id, abv, description, created_by, created_at, popularity, image_url FROM ingredients
+WHERE parent_id IS NULL
+  AND (created_by IS NULL OR created_by = $1)
+  AND ($2::ingredient_kind IS NULL OR kind = $2)
+ORDER BY popularity DESC, name
+`
+
+type ListTopLevelIngredientsParams struct {
+	Viewer pgtype.UUID     `json:"viewer"`
+	Kind   *IngredientKind `json:"kind"`
+}
+
+// Top-level generics for the add-to-bar browse grid: the official catalogue plus
+// the viewer's own root ingredients, optionally filtered by kind, most common first.
+func (q *Queries) ListTopLevelIngredients(ctx context.Context, arg ListTopLevelIngredientsParams) ([]Ingredient, error) {
+	rows, err := q.db.Query(ctx, listTopLevelIngredients, arg.Viewer, arg.Kind)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Ingredient
+	for rows.Next() {
+		var i Ingredient
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Kind,
+			&i.ParentID,
+			&i.Abv,
+			&i.Description,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.Popularity,
+			&i.ImageUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listUnits = `-- name: ListUnits :many
@@ -157,11 +255,11 @@ func (q *Queries) ListUnits(ctx context.Context) ([]Unit, error) {
 }
 
 const searchIngredients = `-- name: SearchIngredients :many
-SELECT id, name, kind, parent_id, abv, description, created_by, created_at FROM ingredients
+SELECT id, name, kind, parent_id, abv, description, created_by, created_at, popularity, image_url FROM ingredients
 WHERE (created_by IS NULL OR created_by = $1)
   AND name ILIKE $2
   AND ($3::ingredient_kind IS NULL OR kind = $3)
-ORDER BY name
+ORDER BY popularity DESC, name
 LIMIT 50
 `
 
@@ -191,6 +289,8 @@ func (q *Queries) SearchIngredients(ctx context.Context, arg SearchIngredientsPa
 			&i.Description,
 			&i.CreatedBy,
 			&i.CreatedAt,
+			&i.Popularity,
+			&i.ImageUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -217,13 +317,15 @@ func (q *Queries) SetIngredientParent(ctx context.Context, arg SetIngredientPare
 }
 
 const upsertOfficialIngredient = `-- name: UpsertOfficialIngredient :one
-INSERT INTO ingredients (id, name, kind, abv, description, created_by)
-VALUES ($1, $2, $3, $4, $5, NULL)
+INSERT INTO ingredients (id, name, kind, abv, description, popularity, image_url, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
 ON CONFLICT (lower(name)) WHERE created_by IS NULL
 DO UPDATE SET kind        = EXCLUDED.kind,
               abv         = EXCLUDED.abv,
-              description = COALESCE(EXCLUDED.description, ingredients.description)
-RETURNING id, name, kind, parent_id, abv, description, created_by, created_at
+              description = COALESCE(EXCLUDED.description, ingredients.description),
+              popularity  = EXCLUDED.popularity,
+              image_url   = COALESCE(EXCLUDED.image_url, ingredients.image_url)
+RETURNING id, name, kind, parent_id, abv, description, created_by, created_at, popularity, image_url
 `
 
 type UpsertOfficialIngredientParams struct {
@@ -232,6 +334,8 @@ type UpsertOfficialIngredientParams struct {
 	Kind        IngredientKind `json:"kind"`
 	Abv         float64        `json:"abv"`
 	Description *string        `json:"description"`
+	Popularity  int32          `json:"popularity"`
+	ImageUrl    *string        `json:"image_url"`
 }
 
 // Seeder upsert: official catalogue rows keyed by case-insensitive name.
@@ -243,6 +347,8 @@ func (q *Queries) UpsertOfficialIngredient(ctx context.Context, arg UpsertOffici
 		arg.Kind,
 		arg.Abv,
 		arg.Description,
+		arg.Popularity,
+		arg.ImageUrl,
 	)
 	var i Ingredient
 	err := row.Scan(
@@ -254,6 +360,8 @@ func (q *Queries) UpsertOfficialIngredient(ctx context.Context, arg UpsertOffici
 		&i.Description,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.Popularity,
+		&i.ImageUrl,
 	)
 	return i, err
 }
