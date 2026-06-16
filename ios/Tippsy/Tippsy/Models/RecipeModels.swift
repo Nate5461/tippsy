@@ -17,6 +17,7 @@ struct Ingredient: Codable, Identifiable, Hashable {
     let parentId: String?
     let abv: Double
     let description: String?
+    let imageUrl: String?
     let custom: Bool
 }
 
@@ -39,6 +40,7 @@ struct BarItem: Codable, Identifiable {
     let parentId: String?
     let abv: Double
     let description: String?
+    let imageUrl: String?
     let custom: Bool
     let addedAt: String
 }
@@ -162,6 +164,30 @@ enum IngredientKind {
 
     static func sortIndex(for code: String) -> Int {
         ordered.firstIndex { $0.code == code } ?? ordered.count
+    }
+
+    /// SF Symbol used as the category icon on My Bar section headers, browse
+    /// tiles, and bottle-card placeholders. Cosmetic and intentionally kept in
+    /// one place — swap these for bundled bottle/category artwork later without
+    /// touching any views.
+    static func icon(for code: String) -> String {
+        switch code {
+        case "spirit":         return "flame.fill"
+        case "liqueur":        return "drop.fill"
+        case "fortified_wine": return "wineglass"
+        case "wine":           return "wineglass"
+        case "beer_cider":     return "mug.fill"
+        case "bitters":        return "eyedropper.halffull"
+        case "juice":          return "cup.and.saucer.fill"
+        case "syrup":          return "drop.triangle.fill"
+        case "soda_mixer":     return "sparkles"
+        case "dairy_egg":      return "oval.portrait.fill"
+        case "fruit":          return "leaf.fill"
+        case "herb_spice":     return "leaf"
+        case "garnish":        return "leaf.circle.fill"
+        case "other":          return "questionmark.circle.fill"
+        default:               return "wineglass"
+        }
     }
 
     // Kinds that pour as liquid — these measure in volume units only.

@@ -56,7 +56,7 @@ struct MyBarView: View {
                 }
             }
             .sheet(isPresented: $showIngredientPicker) {
-                IngredientPickerSheet { ingredient in
+                AddToBarSheet { ingredient in
                     add(ingredient)
                 }
             }
@@ -117,49 +117,38 @@ struct MyBarView: View {
             )
         } else {
             ForEach(groupedItems, id: \.kind) { group in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(IngredientKind.label(for: group.kind))
-                        .font(.headline)
-                        .foregroundColor(.white)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: IngredientKind.icon(for: group.kind))
+                            .font(.headline)
+                            .foregroundColor(.orange)
+                        Text(IngredientKind.label(for: group.kind))
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Spacer()
+                        Text("\(group.items.count)")
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .padding(.horizontal, 4)
 
-                    ForEach(group.items) { item in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 6) {
-                                    Text(item.name)
-                                        .font(.subheadline)
-                                        .foregroundColor(.white)
-                                    if item.custom {
-                                        Text("custom")
-                                            .font(.caption2)
-                                            .foregroundColor(.orange)
-                                    }
-                                }
-                                if item.abv > 0 {
-                                    Text("\(formattedAbv(item.abv))% ABV")
-                                        .font(.caption)
-                                        .foregroundColor(.white.opacity(0.6))
-                                }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(group.items) { item in
+                                BottleCard(
+                                    name: item.name,
+                                    kind: item.kind,
+                                    imageUrl: item.imageUrl,
+                                    abv: item.abv,
+                                    custom: item.custom,
+                                    onRemove: { remove(item) }
+                                )
                             }
-
-                            Spacer()
-
-                            Button {
-                                remove(item)
-                            } label: {
-                                Image(systemName: "trash")
-                                    .font(.subheadline)
-                                    .foregroundColor(.white.opacity(0.5))
-                            }
-                            .buttonStyle(.plain)
                         }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 10)
-                        .background(.white.opacity(0.1))
-                        .cornerRadius(10)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
                     }
                 }
-                .frostedCard()
             }
         }
     }
@@ -201,14 +190,6 @@ struct MyBarView: View {
         }
         .padding(.top, 60)
         .padding(.horizontal, 30)
-    }
-
-    // MARK: - Helpers
-
-    private func formattedAbv(_ abv: Double) -> String {
-        abv.truncatingRemainder(dividingBy: 1) == 0
-            ? String(Int(abv))
-            : String(format: "%.1f", abv)
     }
 
     // MARK: - Data
