@@ -46,4 +46,39 @@ struct SearchService {
         }
     }
 
+    /// Unified, ranked search. `type` is one of "all", "recipes", "menus",
+    /// "users", "ingredients". An empty query lets the backend fall back to its
+    /// popularity/recency browse ordering. `source`/`maxAbv` apply to recipes,
+    /// `kind` to ingredients. Always returns a SearchResults (empty buckets on error).
+    static func search(query: String, type: String, source: String? = nil,
+                       maxAbv: Double? = nil, kind: String? = nil,
+                       completion: @escaping (SearchResults) -> Void) {
+        let empty = SearchResults(recipes: nil, menus: nil, users: nil, ingredients: nil)
+        guard var components = URLComponents(string: "\(baseURL)/search") else {
+            completion(empty)
+            return
+        }
+        var items = [URLQueryItem(name: "type", value: type)]
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { items.append(URLQueryItem(name: "query", value: trimmed)) }
+        if let source { items.append(URLQueryItem(name: "source", value: source)) }
+        if let maxAbv { items.append(URLQueryItem(name: "maxAbv", value: String(maxAbv))) }
+        if let kind { items.append(URLQueryItem(name: "kind", value: kind)) }
+        components.queryItems = items
+
+        guard let url = components.url else {
+            completion(empty)
+            return
+        }
+
+        AuthService.performAuthenticatedRequest(url: url) { data, _, error in
+            guard let data, error == nil,
+                  let results = try? JSONDecoder().decode(SearchResults.self, from: data) else {
+                if let error { print("❌ Error searching: \(error.localizedDescription)") }
+                DispatchQueue.main.async { completion(empty) }
+                return
+            }
+            DispatchQueue.main.async { completion(results) }
+        }
+    }
 }

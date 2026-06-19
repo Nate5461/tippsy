@@ -66,3 +66,21 @@ struct ProfileResponse: Codable {
     let reviews: [Review]
 }
 
+// Lightweight user shape returned by GET /search (userSummaryDTO). The full
+// `User` can't decode it — email/preferences/followers are required there — so
+// search results use this and map to a partial `User` for navigation, the same
+// pattern UserViewModel.fetchFollowingUsers uses. OtherUserProfileView refetches
+// the full profile by id on appear.
+struct UserSummary: Codable, Identifiable, Hashable {
+    let id: String
+    let username: String
+    let displayName: String?
+    let profilePicture: String?
+
+    var asUser: User {
+        User(id: id, username: username, email: "", displayName: displayName,
+             profilePicture: profilePicture, preferences: Preferences(drink: []),
+             followers: [], following: [])
+    }
+}
+
