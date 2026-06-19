@@ -15,20 +15,36 @@ struct IngredientService {
 
     /// Searches the official catalogue plus the caller's custom ingredients.
     static func searchIngredients(query: String, kind: String?, completion: @escaping ([Ingredient]) -> Void) {
+        var items: [URLQueryItem] = []
+        if !query.isEmpty { items.append(URLQueryItem(name: "query", value: query)) }
+        if let kind { items.append(URLQueryItem(name: "kind", value: kind)) }
+        fetchIngredients(queryItems: items, completion: completion)
+    }
+
+    /// Top-level generics for the browse grid (Vodka, Bourbon, Rum…), most
+    /// common first, optionally limited to one kind.
+    static func fetchTopLevel(kind: String?, completion: @escaping ([Ingredient]) -> Void) {
+        var items = [URLQueryItem(name: "topLevel", value: "true")]
+        if let kind { items.append(URLQueryItem(name: "kind", value: kind)) }
+        fetchIngredients(queryItems: items, completion: completion)
+    }
+
+    /// Brands/styles under a generic (the drill-in), alphabetical.
+    static func fetchBrands(parentId: String, completion: @escaping ([Ingredient]) -> Void) {
+        fetchIngredients(queryItems: [URLQueryItem(name: "parentId", value: parentId)], completion: completion)
+    }
+
+    /// Shared `GET /ingredients` caller: builds the URL, authenticates, decodes.
+    private static func fetchIngredients(queryItems: [URLQueryItem], completion: @escaping ([Ingredient]) -> Void) {
         guard var components = URLComponents(string: "\(baseURL)/ingredients") else {
             completion([])
             return
         }
-        var items: [URLQueryItem] = []
-        if !query.isEmpty { items.append(URLQueryItem(name: "query", value: query)) }
-        if let kind { items.append(URLQueryItem(name: "kind", value: kind)) }
-        if !items.isEmpty { components.queryItems = items }
-
+        if !queryItems.isEmpty { components.queryItems = queryItems }
         guard let url = components.url else {
             completion([])
             return
         }
-
         AuthService.performAuthenticatedRequest(url: url) { data, _, error in
             var ingredients: [Ingredient] = []
             if error == nil, let data {

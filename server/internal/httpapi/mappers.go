@@ -70,7 +70,7 @@ func followerDTOsFromFollowing(rows []sqlc.ListFollowingRow) []followerDTO {
 
 // --- ingredients & units ---
 
-func toIngredientDTO(i sqlc.Ingredient) ingredientDTO {
+func (s *Server) toIngredientDTO(i sqlc.Ingredient) ingredientDTO {
 	return ingredientDTO{
 		ID:          i.ID.String(),
 		Name:        i.Name,
@@ -78,6 +78,8 @@ func toIngredientDTO(i sqlc.Ingredient) ingredientDTO {
 		ParentID:    pgUUIDString(i.ParentID),
 		Abv:         i.Abv,
 		Description: i.Description,
+		ImageURL:    s.absoluteURL(i.ImageUrl),
+		Popularity:  i.Popularity,
 		Custom:      i.CreatedBy.Valid,
 	}
 }

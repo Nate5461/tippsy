@@ -277,6 +277,8 @@ type Ingredient struct {
 	Description *string            `json:"description"`
 	CreatedBy   pgtype.UUID        `json:"created_by"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	Popularity  int32              `json:"popularity"`
+	ImageUrl    *string            `json:"image_url"`
 }
 
 type Recipe struct {

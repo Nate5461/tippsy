@@ -39,13 +39,15 @@ func (s *Server) handleListBar(w http.ResponseWriter, r *http.Request) {
 	out := make([]barItemDTO, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, barItemDTO{
-			ingredientDTO: toIngredientDTO(sqlc.Ingredient{
+			ingredientDTO: s.toIngredientDTO(sqlc.Ingredient{
 				ID:          row.ID,
 				Name:        row.Name,
 				Kind:        row.Kind,
 				ParentID:    row.ParentID,
 				Abv:         row.Abv,
 				Description: row.Description,
+				ImageUrl:    row.ImageUrl,
+				Popularity:  row.Popularity,
 				CreatedBy:   row.CreatedBy,
 			}),
 			AddedAt: row.AddedAt.Time,

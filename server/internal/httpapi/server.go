@@ -95,7 +95,9 @@ type ingredientDTO struct {
 	ParentID    *string `json:"parentId"`
 	Abv         float64 `json:"abv"`
 	Description *string `json:"description"`
-	Custom      bool    `json:"custom"` // true = user-created, not in the official catalogue
+	ImageURL    *string `json:"imageUrl"`   // absolute; null until artwork is added
+	Popularity  int32   `json:"popularity"` // higher = more common on the browse grid
+	Custom      bool    `json:"custom"`     // true = user-created, not in the official catalogue
 }
 
 type unitDTO struct {

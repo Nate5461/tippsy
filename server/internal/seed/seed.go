@@ -23,10 +23,12 @@ type File struct {
 
 type IngredientSpec struct {
 	Name        string  `json:"name"`
-	Kind        string  `json:"kind"`   // spirit, liqueur, fortified_wine, wine, beer_cider, bitters, juice, syrup, soda_mixer, dairy_egg, fruit, herb_spice, garnish, other
-	Abv         float64 `json:"abv"`    // percentage, 0 for non-alcoholic
-	Parent      string  `json:"parent"` // optional: name of the generic this is a brand/style of
+	Kind        string  `json:"kind"`       // spirit, liqueur, fortified_wine, wine, beer_cider, bitters, juice, syrup, soda_mixer, dairy_egg, fruit, herb_spice, garnish, other
+	Abv         float64 `json:"abv"`        // percentage, 0 for non-alcoholic
+	Parent      string  `json:"parent"`     // optional: name of the generic this is a brand/style of
 	Description string  `json:"description"`
+	Popularity  int32   `json:"popularity"` // higher floats up the add-to-bar browse grid; only meaningful for top-level generics
+	ImageURL    string  `json:"imageUrl"`   // optional relative path under /uploads (e.g. /uploads/bottles/vodka.png); artwork is phased in later
 }
 
 type RecipeSpec struct {
@@ -122,6 +124,8 @@ func Import(ctx context.Context, q *sqlc.Queries, f File) (Stats, error) {
 			Kind:        kind,
 			Abv:         spec.Abv,
 			Description: optional(spec.Description),
+			Popularity:  spec.Popularity,
+			ImageUrl:    optional(spec.ImageURL),
 		})
 		if err != nil {
 			return stats, fmt.Errorf("upsert ingredient %q: %w", spec.Name, err)
