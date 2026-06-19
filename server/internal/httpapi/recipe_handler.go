@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/Nate5461/tippsy/server/internal/auth"
@@ -44,6 +43,7 @@ type recipePayload struct {
 	ImageURL       *string             `json:"imageUrl"`
 	ParentRecipeID *string             `json:"parentRecipeId"` // set when publishing a modified variant
 	Ingredients    []recipeLineRequest `json:"ingredients"`
+	Tags           []string            `json:"tags"` // free-form labels; normalized to slugs
 }
 
 // validatedRecipe is a recipePayload after validation: enum-typed method, the
@@ -238,6 +238,10 @@ func (s *Server) handleCreateRecipe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, msg)
 		return
 	}
+	if msg := s.applyRecipeTags(r.Context(), qtx, id, p.Tags); msg != "" {
+		writeError(w, http.StatusInternalServerError, msg)
+		return
+	}
 	if err := tx.Commit(r.Context()); err != nil {
 		writeError(w, http.StatusInternalServerError, "could not create recipe")
 		return
@@ -299,6 +303,10 @@ func (s *Server) handleUpdateRecipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if msg := insertRecipeLines(r.Context(), qtx, id, v.lines); msg != "" {
+		writeError(w, http.StatusInternalServerError, msg)
+		return
+	}
+	if msg := s.applyRecipeTags(r.Context(), qtx, id, p.Tags); msg != "" {
 		writeError(w, http.StatusInternalServerError, msg)
 		return
 	}
@@ -367,42 +375,38 @@ func (s *Server) writeRecipeDetail(w http.ResponseWriter, ctx context.Context, s
 	for _, row := range lineRows {
 		lines = append(lines, toRecipeLineDTO(row))
 	}
+	tagRows, err := s.q.ListRecipeTags(ctx, id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not load recipe tags")
+		return
+	}
+	summary := s.toRecipeSummaryDTO(fieldsFromGetRecipe(rec))
+	summary.Tags = tagDTOs(tagRows)
 	writeJSON(w, status, recipeDetailDTO{
-		recipeSummaryDTO: s.toRecipeSummaryDTO(fieldsFromGetRecipe(rec)),
+		recipeSummaryDTO: summary,
 		Instructions:     rec.Instructions,
 		Ingredients:      lines,
 	})
 }
 
+// handleSearchRecipes backs GET /recipes: the ranked recipe search/browse list.
+// It shares the same ranked query as the unified /search recipes bucket and adds
+// the optional source / maxAbv / tag filters.
 func (s *Server) handleSearchRecipes(w http.ResponseWriter, r *http.Request) {
-	params := sqlc.SearchRecipesParams{
-		Pattern: "%" + r.URL.Query().Get("query") + "%",
+	source, msg := parseSourceParam(r)
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
 	}
-	if src := r.URL.Query().Get("source"); src != "" {
-		if src != string(sqlc.RecipeSourceOfficial) && src != string(sqlc.RecipeSourceCommunity) {
-			writeError(w, http.StatusBadRequest, "source must be official or community")
-			return
-		}
-		s := sqlc.RecipeSource(src)
-		params.Source = &s
+	maxAbv, msg := parseMaxAbvParam(r)
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
 	}
-	if raw := r.URL.Query().Get("maxAbv"); raw != "" {
-		maxAbv, err := strconv.ParseFloat(raw, 64)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "maxAbv must be a number")
-			return
-		}
-		params.MaxAbv = &maxAbv
-	}
-
-	rows, err := s.q.SearchRecipes(r.Context(), params)
+	out, err := s.searchRecipes(r.Context(), strings.TrimSpace(r.URL.Query().Get("query")), source, maxAbv, optionalParam(r, "tag"), searchTypeLimit)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not search recipes")
 		return
-	}
-	out := make([]recipeSummaryDTO, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, s.toRecipeSummaryDTO(fieldsFromSearchRecipe(row)))
 	}
 	writeJSON(w, http.StatusOK, out)
 }

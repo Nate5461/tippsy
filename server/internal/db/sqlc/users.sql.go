@@ -139,13 +139,23 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 
 const searchUsers = `-- name: SearchUsers :many
 SELECT id, username, email, password_hash, profile_picture, location, created_at, verified_at, display_name, bio, updated_at, measure_pref FROM users
-WHERE username ILIKE $1
-ORDER BY username
-LIMIT 50
+WHERE $1::text = ''
+   OR username ILIKE '%' || $1::text || '%'
+   OR display_name ILIKE '%' || $1::text || '%'
+   OR username % $1::text
+ORDER BY similarity(username, $1::text) DESC, username
+LIMIT $2
 `
 
-func (q *Queries) SearchUsers(ctx context.Context, pattern string) ([]User, error) {
-	rows, err := q.db.Query(ctx, searchUsers, pattern)
+type SearchUsersParams struct {
+	Query string `json:"query"`
+	Lim   int64  `json:"lim"`
+}
+
+// Ranked, typo-tolerant user search over username and display_name. An empty
+// query lists everyone alphabetically (similarity to ” is 0 for all rows).
+func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, searchUsers, arg.Query, arg.Lim)
 	if err != nil {
 		return nil, err
 	}

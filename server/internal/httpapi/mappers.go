@@ -116,6 +116,8 @@ type recipeSummaryFields struct {
 	CreatedAt        pgtype.Timestamptz
 	AverageRating    float64
 	TotalReviews     int64
+	TagSlugs         []string
+	TagLabels        []string
 }
 
 func (s *Server) toRecipeSummaryDTO(f recipeSummaryFields) recipeSummaryDTO {
@@ -139,6 +141,7 @@ func (s *Server) toRecipeSummaryDTO(f recipeSummaryFields) recipeSummaryDTO {
 		ImageURL:         s.absoluteURL(f.ImageUrl),
 		AverageRating:    f.AverageRating,
 		TotalReviews:     f.TotalReviews,
+		Tags:             tagDTOsFromSlugsLabels(f.TagSlugs, f.TagLabels),
 		CreatedAt:        f.CreatedAt.Time,
 	}
 }
@@ -146,25 +149,25 @@ func (s *Server) toRecipeSummaryDTO(f recipeSummaryFields) recipeSummaryDTO {
 func fieldsFromGetRecipe(r sqlc.GetRecipeByIDRow) recipeSummaryFields {
 	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.GlassName,
 		r.Source, r.AuthorID, r.AuthorName, r.Attribution, r.ParentRecipeID, r.ParentRecipeName,
-		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews}
+		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews, nil, nil}
 }
 
 func fieldsFromSearchRecipe(r sqlc.SearchRecipesRow) recipeSummaryFields {
 	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.GlassName,
 		r.Source, r.AuthorID, r.AuthorName, r.Attribution, r.ParentRecipeID, r.ParentRecipeName,
-		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews}
+		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews, r.TagSlugs, r.TagLabels}
 }
 
 func fieldsFromMakeable(r sqlc.MakeableRecipesRow) recipeSummaryFields {
 	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.GlassName,
 		r.Source, r.AuthorID, r.AuthorName, r.Attribution, r.ParentRecipeID, r.ParentRecipeName,
-		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews}
+		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews, nil, nil}
 }
 
 func fieldsFromFavourite(r sqlc.ListFavouritesRow) recipeSummaryFields {
 	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.GlassName,
 		r.Source, r.AuthorID, r.AuthorName, r.Attribution, r.ParentRecipeID, r.ParentRecipeName,
-		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews}
+		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews, nil, nil}
 }
 
 // toRecipeLineDTO renders one structured recipe line, including the measure
@@ -193,5 +196,102 @@ func toRecipeLineDTO(row sqlc.ListRecipeIngredientsRow) recipeLineDTO {
 		Optional:       row.IsOptional,
 		Garnish:        row.IsGarnish,
 		Display:        measureDTO{Metric: metric, Imperial: imperial},
+	}
+}
+
+// fieldsFromMenuItem maps a menu line (recipe + position/note) to the shared
+// recipe summary fields. Per-recipe tags are not fetched for menu contents.
+func fieldsFromMenuItem(r sqlc.ListMenuItemsRow) recipeSummaryFields {
+	return recipeSummaryFields{r.ID, r.Slug, r.Name, r.Description, r.Method, r.Glass, r.GlassName,
+		r.Source, r.AuthorID, r.AuthorName, r.Attribution, r.ParentRecipeID, r.ParentRecipeName,
+		r.Sweetness, r.EstAbv, r.ImageUrl, r.CreatedAt, r.AverageRating, r.TotalReviews, nil, nil}
+}
+
+// --- tags ---
+
+func toTagDTO(t sqlc.Tag) tagDTO {
+	return tagDTO{Slug: t.Slug, Label: t.Label}
+}
+
+func tagDTOs(rows []sqlc.Tag) []tagDTO {
+	out := make([]tagDTO, 0, len(rows))
+	for _, t := range rows {
+		out = append(out, toTagDTO(t))
+	}
+	return out
+}
+
+// tagDTOsFromSlugsLabels zips the parallel slug/label arrays that the search and
+// list queries aggregate into tag DTOs.
+func tagDTOsFromSlugsLabels(slugs, labels []string) []tagDTO {
+	out := make([]tagDTO, 0, len(slugs))
+	for i := range slugs {
+		label := slugs[i]
+		if i < len(labels) {
+			label = labels[i]
+		}
+		out = append(out, tagDTO{Slug: slugs[i], Label: label})
+	}
+	return out
+}
+
+// --- menus ---
+
+// menuSummaryFields is the common column set shared by the menu list/detail/search
+// queries, mapped through one converter.
+type menuSummaryFields struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	Name        string
+	Description *string
+	Visibility  sqlc.MenuVisibility
+	ImageUrl    *string
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	AuthorName  string
+	RecipeCount int64
+	TagSlugs    []string
+	TagLabels   []string
+}
+
+func (s *Server) toMenuSummaryDTO(f menuSummaryFields) menuSummaryDTO {
+	return menuSummaryDTO{
+		ID:          f.ID.String(),
+		Name:        f.Name,
+		Description: f.Description,
+		Visibility:  string(f.Visibility),
+		ImageURL:    s.absoluteURL(f.ImageUrl),
+		AuthorID:    f.UserID.String(),
+		AuthorName:  f.AuthorName,
+		RecipeCount: f.RecipeCount,
+		Tags:        tagDTOsFromSlugsLabels(f.TagSlugs, f.TagLabels),
+		CreatedAt:   f.CreatedAt.Time,
+		UpdatedAt:   f.UpdatedAt.Time,
+	}
+}
+
+func menuFieldsFromGet(r sqlc.GetMenuByIDRow) menuSummaryFields {
+	return menuSummaryFields{r.ID, r.UserID, r.Name, r.Description, r.Visibility, r.ImageUrl,
+		r.CreatedAt, r.UpdatedAt, r.AuthorName, r.RecipeCount, r.TagSlugs, r.TagLabels}
+}
+
+func menuFieldsFromList(r sqlc.ListMenusByUserRow) menuSummaryFields {
+	return menuSummaryFields{r.ID, r.UserID, r.Name, r.Description, r.Visibility, r.ImageUrl,
+		r.CreatedAt, r.UpdatedAt, r.AuthorName, r.RecipeCount, r.TagSlugs, r.TagLabels}
+}
+
+func menuFieldsFromSearch(r sqlc.SearchMenusRow) menuSummaryFields {
+	return menuSummaryFields{r.ID, r.UserID, r.Name, r.Description, r.Visibility, r.ImageUrl,
+		r.CreatedAt, r.UpdatedAt, r.AuthorName, r.RecipeCount, r.TagSlugs, r.TagLabels}
+}
+
+// --- users (lightweight, for search) ---
+
+func (s *Server) toUserSummaryDTO(u sqlc.User) userSummaryDTO {
+	return userSummaryDTO{
+		ID:             u.ID.String(),
+		Username:       u.Username,
+		DisplayName:    u.DisplayName,
+		ProfilePicture: s.absoluteURL(u.ProfilePicture),
 	}
 }

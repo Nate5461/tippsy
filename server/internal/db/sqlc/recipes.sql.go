@@ -268,24 +268,49 @@ const searchRecipes = `-- name: SearchRecipes :many
 SELECT r.id, r.slug, r.name, r.description, r.instructions, r.method, r.glass, r.source, r.author_id, r.attribution, r.sweetness, r.est_abv, r.image_url, r.created_at, r.updated_at, r.parent_recipe_id, u.username AS author_name, g.name AS glass_name,
        pr.name AS parent_recipe_name,
        COALESCE(AVG(rv.rating), 0)::float8 AS average_rating,
-       COUNT(rv.id)                        AS total_reviews
+       COUNT(rv.id)                        AS total_reviews,
+       COALESCE((SELECT array_agg(t.slug  ORDER BY t.label)
+                 FROM recipe_tags rt JOIN tags t ON t.id = rt.tag_id
+                 WHERE rt.recipe_id = r.id), ARRAY[]::text[]) AS tag_slugs,
+       COALESCE((SELECT array_agg(t.label ORDER BY t.label)
+                 FROM recipe_tags rt JOIN tags t ON t.id = rt.tag_id
+                 WHERE rt.recipe_id = r.id), ARRAY[]::text[]) AS tag_labels,
+       COALESCE(
+         CASE WHEN $1::text = '' THEN 0
+              ELSE ts_rank(
+                     setweight(to_tsvector('english', r.name), 'A') ||
+                     setweight(to_tsvector('english', coalesce(r.description, '')), 'B'),
+                     websearch_to_tsquery('english', $1::text))
+                   + similarity(r.name, $1::text)
+         END, 0)::float8 AS rank
 FROM recipes r
 JOIN glass_types g    ON g.slug = r.glass
 LEFT JOIN users u     ON u.id = r.author_id
 LEFT JOIN recipes pr  ON pr.id = r.parent_recipe_id
 LEFT JOIN reviews rv  ON rv.recipe_id = r.id
-WHERE r.name ILIKE $1
+WHERE (
+        $1::text = ''
+        OR to_tsvector('english', r.name || ' ' || coalesce(r.description, '')) @@ websearch_to_tsquery('english', $1::text)
+        OR r.name % $1::text
+        OR EXISTS (SELECT 1 FROM recipe_tags rt2 JOIN tags t2 ON t2.id = rt2.tag_id
+                   WHERE rt2.recipe_id = r.id AND (t2.slug = $1::text OR t2.label ILIKE '%' || $1::text || '%'))
+      )
   AND ($2::recipe_source IS NULL OR r.source = $2)
   AND ($3::float8 IS NULL OR r.est_abv <= $3)
+  AND ($4::text IS NULL OR EXISTS (
+          SELECT 1 FROM recipe_tags rt3 JOIN tags t3 ON t3.id = rt3.tag_id
+          WHERE rt3.recipe_id = r.id AND t3.slug = $4))
 GROUP BY r.id, u.username, g.name, pr.name
-ORDER BY total_reviews DESC, average_rating DESC, r.name
-LIMIT 100
+ORDER BY rank DESC, total_reviews DESC, average_rating DESC, r.name
+LIMIT $5
 `
 
 type SearchRecipesParams struct {
-	Pattern string        `json:"pattern"`
-	Source  *RecipeSource `json:"source"`
-	MaxAbv  *float64      `json:"max_abv"`
+	Query  string        `json:"query"`
+	Source *RecipeSource `json:"source"`
+	MaxAbv *float64      `json:"max_abv"`
+	Tag    *string       `json:"tag"`
+	Lim    int64         `json:"lim"`
 }
 
 type SearchRecipesRow struct {
@@ -310,11 +335,25 @@ type SearchRecipesRow struct {
 	ParentRecipeName *string            `json:"parent_recipe_name"`
 	AverageRating    float64            `json:"average_rating"`
 	TotalReviews     int64              `json:"total_reviews"`
+	TagSlugs         []string           `json:"tag_slugs"`
+	TagLabels        []string           `json:"tag_labels"`
+	Rank             float64            `json:"rank"`
 }
 
-// Search doubles as the popularity-ranked browse list when the pattern is '%%'.
+// Ranked, typo-tolerant recipe search; also powers the popularity-ordered browse
+// list when the query is empty (every row ranks 0 and falls back to popularity).
+// Relevance combines full-text (name^A, description^B) with pg_trgm name
+// similarity; an empty query short-circuits the match. Tags are matched in the
+// WHERE and surfaced via correlated subqueries so they never inflate the review
+// aggregates. Optional source / maxAbv / tag filters narrow the result.
 func (q *Queries) SearchRecipes(ctx context.Context, arg SearchRecipesParams) ([]SearchRecipesRow, error) {
-	rows, err := q.db.Query(ctx, searchRecipes, arg.Pattern, arg.Source, arg.MaxAbv)
+	rows, err := q.db.Query(ctx, searchRecipes,
+		arg.Query,
+		arg.Source,
+		arg.MaxAbv,
+		arg.Tag,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -344,6 +383,9 @@ func (q *Queries) SearchRecipes(ctx context.Context, arg SearchRecipesParams) ([
 			&i.ParentRecipeName,
 			&i.AverageRating,
 			&i.TotalReviews,
+			&i.TagSlugs,
+			&i.TagLabels,
+			&i.Rank,
 		); err != nil {
 			return nil, err
 		}

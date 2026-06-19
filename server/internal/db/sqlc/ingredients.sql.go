@@ -257,22 +257,33 @@ func (q *Queries) ListUnits(ctx context.Context) ([]Unit, error) {
 const searchIngredients = `-- name: SearchIngredients :many
 SELECT id, name, kind, parent_id, abv, description, created_by, created_at, popularity, image_url FROM ingredients
 WHERE (created_by IS NULL OR created_by = $1)
-  AND name ILIKE $2
+  AND (
+        $2::text = ''
+        OR name ILIKE '%' || $2::text || '%'
+        OR name % $2::text
+      )
   AND ($3::ingredient_kind IS NULL OR kind = $3)
-ORDER BY popularity DESC, name
-LIMIT 50
+ORDER BY similarity(name, $2::text) DESC, popularity DESC, name
+LIMIT $4
 `
 
 type SearchIngredientsParams struct {
-	Viewer  pgtype.UUID     `json:"viewer"`
-	Pattern string          `json:"pattern"`
-	Kind    *IngredientKind `json:"kind"`
+	Viewer pgtype.UUID     `json:"viewer"`
+	Query  string          `json:"query"`
+	Kind   *IngredientKind `json:"kind"`
+	Lim    int64           `json:"lim"`
 }
 
 // Catalogue search for pickers: everyone sees the official catalogue, plus
-// their own custom ingredients.
+// their own custom ingredients. Ranked and typo-tolerant (pg_trgm); an empty
+// query falls back to the popularity order used by the browse grid.
 func (q *Queries) SearchIngredients(ctx context.Context, arg SearchIngredientsParams) ([]Ingredient, error) {
-	rows, err := q.db.Query(ctx, searchIngredients, arg.Viewer, arg.Pattern, arg.Kind)
+	rows, err := q.db.Query(ctx, searchIngredients,
+		arg.Viewer,
+		arg.Query,
+		arg.Kind,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
