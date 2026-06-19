@@ -41,11 +41,16 @@ SET username        = COALESCE(sqlc.narg('username'), username),
 WHERE id = sqlc.arg('id')
 RETURNING *;
 
+-- Ranked, typo-tolerant user search over username and display_name. An empty
+-- query lists everyone alphabetically (similarity to '' is 0 for all rows).
 -- name: SearchUsers :many
 SELECT * FROM users
-WHERE username ILIKE @pattern
-ORDER BY username
-LIMIT 50;
+WHERE @query::text = ''
+   OR username ILIKE '%' || @query::text || '%'
+   OR display_name ILIKE '%' || @query::text || '%'
+   OR username % @query::text
+ORDER BY similarity(username, @query::text) DESC, username
+LIMIT sqlc.arg('lim');
 
 -- name: TopUsers :many
 SELECT u.*, COUNT(f.follower_id) AS follower_count

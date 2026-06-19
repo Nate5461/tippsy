@@ -108,6 +108,48 @@ func (ns NullMeasurePref) Value() (driver.Value, error) {
 	return string(ns.MeasurePref), nil
 }
 
+type MenuVisibility string
+
+const (
+	MenuVisibilityPublic  MenuVisibility = "public"
+	MenuVisibilityPrivate MenuVisibility = "private"
+)
+
+func (e *MenuVisibility) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MenuVisibility(s)
+	case string:
+		*e = MenuVisibility(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MenuVisibility: %T", src)
+	}
+	return nil
+}
+
+type NullMenuVisibility struct {
+	MenuVisibility MenuVisibility `json:"menu_visibility"`
+	Valid          bool           `json:"valid"` // Valid is true if MenuVisibility is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMenuVisibility) Scan(value interface{}) error {
+	if value == nil {
+		ns.MenuVisibility, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MenuVisibility.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMenuVisibility) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MenuVisibility), nil
+}
+
 type RecipeMethod string
 
 const (
@@ -281,6 +323,29 @@ type Ingredient struct {
 	ImageUrl    *string            `json:"image_url"`
 }
 
+type Menu struct {
+	ID          uuid.UUID          `json:"id"`
+	UserID      uuid.UUID          `json:"user_id"`
+	Name        string             `json:"name"`
+	Description *string            `json:"description"`
+	Visibility  MenuVisibility     `json:"visibility"`
+	ImageUrl    *string            `json:"image_url"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type MenuItem struct {
+	MenuID   uuid.UUID `json:"menu_id"`
+	RecipeID uuid.UUID `json:"recipe_id"`
+	Position int16     `json:"position"`
+	Note     *string   `json:"note"`
+}
+
+type MenuTag struct {
+	MenuID uuid.UUID `json:"menu_id"`
+	TagID  uuid.UUID `json:"tag_id"`
+}
+
 type Recipe struct {
 	ID             uuid.UUID          `json:"id"`
 	Slug           string             `json:"slug"`
@@ -311,6 +376,11 @@ type RecipeIngredient struct {
 	IsGarnish    bool      `json:"is_garnish"`
 }
 
+type RecipeTag struct {
+	RecipeID uuid.UUID `json:"recipe_id"`
+	TagID    uuid.UUID `json:"tag_id"`
+}
+
 type Review struct {
 	ID              uuid.UUID          `json:"id"`
 	UserID          uuid.UUID          `json:"user_id"`
@@ -320,6 +390,13 @@ type Review struct {
 	ImpairmentLevel *int16             `json:"impairment_level"`
 	PhotoUrl        *string            `json:"photo_url"`
 	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
+type Tag struct {
+	ID        uuid.UUID          `json:"id"`
+	Slug      string             `json:"slug"`
+	Label     string             `json:"label"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type Unit struct {

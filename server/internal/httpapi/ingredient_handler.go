@@ -99,9 +99,10 @@ func (s *Server) handleSearchIngredients(w http.ResponseWriter, r *http.Request)
 		})
 	default: // free-text search (long tail)
 		rows, err = s.q.SearchIngredients(r.Context(), sqlc.SearchIngredientsParams{
-			Viewer:  pgUUID(userID),
-			Pattern: "%" + query.Get("query") + "%",
-			Kind:    kind,
+			Viewer: pgUUID(userID),
+			Query:  strings.TrimSpace(query.Get("query")),
+			Kind:   kind,
+			Lim:    searchTypeLimit,
 		})
 	}
 	if err != nil {

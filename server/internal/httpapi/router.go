@@ -46,8 +46,12 @@ func (s *Server) Router() http.Handler {
 		fileServer := http.FileServer(http.Dir(s.cfg.UploadDir))
 		r.Handle("/uploads/*", http.StripPrefix("/uploads/", fileServer))
 
+		// Unified, Instagram-style search across recipes, menus, users, and
+		// ingredients, plus type-specific shortcuts and tag autocomplete.
 		r.Route("/search", func(r chi.Router) {
+			r.Get("/", s.handleSearch)
 			r.Get("/users", s.handleSearchUsers)
+			r.Get("/tags", s.handleSearchTags)
 		})
 
 		r.Get("/units", s.handleListUnits)
@@ -70,6 +74,18 @@ func (s *Server) Router() http.Handler {
 			r.Delete("/{id}/favourite", s.handleRemoveFavourite)
 		})
 
+		// User-created menus (lists of cocktails). GET / is public discovery;
+		// the rest are owner-scoped.
+		r.Route("/menus", func(r chi.Router) {
+			r.Get("/", s.handleSearchMenus)
+			r.Post("/", s.handleCreateMenu)
+			r.Get("/{id}", s.handleGetMenu)
+			r.Put("/{id}", s.handleUpdateMenu)
+			r.Delete("/{id}", s.handleDeleteMenu)
+			r.Post("/{id}/items", s.handleAddMenuItem)
+			r.Delete("/{id}/items/{recipeId}", s.handleRemoveMenuItem)
+		})
+
 		r.Route("/users", func(r chi.Router) {
 			r.Get("/topUsers", s.handleTopUsers)
 			r.Get("/{id}", s.handleGetUser)
@@ -81,11 +97,12 @@ func (s *Server) Router() http.Handler {
 			r.Post("/{id}/follow", s.handleFollow)
 			r.Post("/{id}/unfollow", s.handleUnfollow)
 
-			// Personal: the bar and the menu it can make.
+			// Personal: the bar, the makeable-from-bar list, and the user's menus.
 			r.Get("/{id}/bar", s.handleListBar)
 			r.Post("/{id}/bar", s.handleAddBarItem)
 			r.Delete("/{id}/bar/{ingredientId}", s.handleRemoveBarItem)
-			r.Get("/{id}/menu", s.handleMyMenu)
+			r.Get("/{id}/makeable", s.handleMakeable)
+			r.Get("/{id}/menus", s.handleListUserMenus)
 		})
 
 		r.Route("/reviews", func(r chi.Router) {

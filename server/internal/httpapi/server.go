@@ -159,6 +159,7 @@ type recipeSummaryDTO struct {
 	ImageURL         *string   `json:"imageUrl"`
 	AverageRating    float64   `json:"averageRating"`
 	TotalReviews     int64     `json:"totalReviews"`
+	Tags             []tagDTO  `json:"tags,omitempty"`
 	CreatedAt        time.Time `json:"createdAt"`
 }
 
@@ -166,6 +167,50 @@ type recipeDetailDTO struct {
 	recipeSummaryDTO
 	Instructions *string         `json:"instructions"`
 	Ingredients  []recipeLineDTO `json:"ingredients"`
+}
+
+// --- tags, menus, and search ---
+
+type tagDTO struct {
+	Slug  string `json:"slug"`
+	Label string `json:"label"`
+}
+
+type menuSummaryDTO struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description"`
+	Visibility  string    `json:"visibility"` // "public" | "private"
+	ImageURL    *string   `json:"imageUrl"`
+	AuthorID    string    `json:"authorId"`
+	AuthorName  string    `json:"authorName"`
+	RecipeCount int64     `json:"recipeCount"`
+	Tags        []tagDTO  `json:"tags"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+type menuDetailDTO struct {
+	menuSummaryDTO
+	Recipes []recipeSummaryDTO `json:"recipes"`
+}
+
+// userSummaryDTO is the lightweight user shape used in search results, avoiding
+// the followers/following round-trips that the full userDTO performs.
+type userSummaryDTO struct {
+	ID             string  `json:"id"`
+	Username       string  `json:"username"`
+	DisplayName    *string `json:"displayName"`
+	ProfilePicture *string `json:"profilePicture"`
+}
+
+// searchResultsDTO is the grouped shape returned by GET /search. Buckets not
+// requested (or empty) are omitted, so a single-type search returns just one.
+type searchResultsDTO struct {
+	Recipes     []recipeSummaryDTO `json:"recipes,omitempty"`
+	Menus       []menuSummaryDTO   `json:"menus,omitempty"`
+	Users       []userSummaryDTO   `json:"users,omitempty"`
+	Ingredients []ingredientDTO    `json:"ingredients,omitempty"`
 }
 
 type profileResponse struct {

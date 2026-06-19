@@ -5,14 +5,19 @@ SELECT * FROM ingredients WHERE id = $1;
 SELECT * FROM ingredients WHERE id = ANY(@ids::uuid[]);
 
 -- Catalogue search for pickers: everyone sees the official catalogue, plus
--- their own custom ingredients.
+-- their own custom ingredients. Ranked and typo-tolerant (pg_trgm); an empty
+-- query falls back to the popularity order used by the browse grid.
 -- name: SearchIngredients :many
 SELECT * FROM ingredients
 WHERE (created_by IS NULL OR created_by = @viewer)
-  AND name ILIKE @pattern
+  AND (
+        @query::text = ''
+        OR name ILIKE '%' || @query::text || '%'
+        OR name % @query::text
+      )
   AND (sqlc.narg('kind')::ingredient_kind IS NULL OR kind = sqlc.narg('kind'))
-ORDER BY popularity DESC, name
-LIMIT 50;
+ORDER BY similarity(name, @query::text) DESC, popularity DESC, name
+LIMIT sqlc.arg('lim');
 
 -- Top-level generics for the add-to-bar browse grid: the official catalogue plus
 -- the viewer's own root ingredients, optionally filtered by kind, most common first.
