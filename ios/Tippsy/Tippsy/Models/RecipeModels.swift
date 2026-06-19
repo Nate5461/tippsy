@@ -86,6 +86,7 @@ struct RecipeSummary: Codable, Identifiable, Hashable {
     let imageUrl: String?
     let averageRating: Double
     let totalReviews: Int
+    let tags: [Tag]?
     let createdAt: String
 }
 
@@ -112,6 +113,55 @@ struct RecipeDetail: Codable, Identifiable, Hashable {
     let createdAt: String
     let instructions: String?
     let ingredients: [RecipeLine]
+}
+
+// MARK: - Tags, menus, unified search
+
+struct Tag: Codable, Identifiable, Hashable {
+    let slug: String
+    let label: String
+
+    var id: String { slug }
+}
+
+// A user-created list of cocktails. Mirrors menuSummaryDTO.
+struct MenuSummary: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let description: String?
+    let visibility: String // "public" | "private"
+    let imageUrl: String?
+    let authorId: String
+    let authorName: String
+    let recipeCount: Int
+    let tags: [Tag]
+    let createdAt: String
+    let updatedAt: String
+}
+
+// GET /menus/{id}: the summary fields (flattened) plus the ordered recipes.
+struct MenuDetail: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let description: String?
+    let visibility: String
+    let imageUrl: String?
+    let authorId: String
+    let authorName: String
+    let recipeCount: Int
+    let tags: [Tag]
+    let createdAt: String
+    let updatedAt: String
+    let recipes: [RecipeSummary]
+}
+
+// Grouped response from GET /search. Buckets are omitted (nil) when not
+// requested or empty.
+struct SearchResults: Codable {
+    let recipes: [RecipeSummary]?
+    let menus: [MenuSummary]?
+    let users: [UserSummary]?
+    let ingredients: [Ingredient]?
 }
 
 // The recipe-domain review shape (camelCase). A nil rating is a bare log
