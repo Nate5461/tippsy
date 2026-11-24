@@ -1,0 +1,5 @@
+DROP TRIGGER IF EXISTS users_set_updated_at ON users;
+DROP FUNCTION IF EXISTS set_updated_at();
+ALTER TABLE users DROP COLUMN IF EXISTS updated_at;
+ALTER TABLE users DROP COLUMN IF EXISTS bio;
+ALTER TABLE users DROP COLUMN IF EXISTS display_name;

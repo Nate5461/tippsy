@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Uploaded files (served at runtime, not source)
+backend/src/uploads/
+
+# macOS
+.DS_Store
+
+# Xcode — build output & user-specific state
+build/
+DerivedData/
+*.xcuserstate
+**/xcuserdata/
+*.xcscmblueprint
+*.xccheckout
